@@ -45,7 +45,7 @@ coverage
 next-env.d.ts
 
 # prisma
-generated/prisma
+**/generated/prisma
 
 # OS
 .DS_Store

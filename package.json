@@ -9,7 +9,11 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "db:generate": "pnpm --filter database generate",
+    "db:migrate": "pnpm --filter database migrate:dev",
+    "db:reset": "pnpm --filter database migrate:reset",
+    "db:studio": "pnpm --filter database studio"
   },
   "keywords": [],
   "author": "",
