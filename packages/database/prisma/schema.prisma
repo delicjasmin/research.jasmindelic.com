@@ -11,3 +11,28 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model Document {
+  id      String  @id @default(cuid())
+  url     String
+  title   String?
+  summary String?
+  status  String  @default("PENDING")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  chunks DocumentChunk[]
+}
+
+model DocumentChunk {
+  id String @id @default(cuid())
+
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id])
+
+  pageNumber Int
+  content    String
+
+  createdAt DateTime @default(now())
+}
