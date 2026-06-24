@@ -4,6 +4,7 @@
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
   "moduleNameMapper": {
+    "^ai$": "<rootDir>/mocks/ai.ts",
     "^database$": "<rootDir>/mocks/database.ts"
   },
   "transform": {

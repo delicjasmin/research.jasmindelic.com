@@ -29,10 +29,13 @@ model DocumentChunk {
   id String @id @default(cuid())
 
   documentId String
-  document   Document @relation(fields: [documentId], references: [id])
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   pageNumber Int
   content    String
+  embedding  Unsupported("vector(1536)")?
 
   createdAt DateTime @default(now())
+
+  @@index([documentId])
 }

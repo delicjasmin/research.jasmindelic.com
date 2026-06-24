@@ -243,6 +243,9 @@ importers:
       '@nestjs/websockets':
         specifier: ^11.1.27
         version: 11.1.27(@nestjs/common@11.1.27(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.27)(@nestjs/platform-socket.io@11.1.27)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      ai:
+        specifier: workspace:*
+        version: link:../../packages/ai
       bullmq:
         specifier: ^5.79.1
         version: 5.79.1
@@ -440,9 +443,19 @@ importers:
       ai:
         specifier: ^6.0.208
         version: 6.0.208(zod@4.4.3)
+      database:
+        specifier: workspace:*
+        version: link:../database
       openai:
         specifier: ^6.44.0
         version: 6.44.0(ws@8.21.0)(zod@4.4.3)
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.2
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
 
   packages/database:
     dependencies:
