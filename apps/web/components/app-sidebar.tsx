@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { SignInButton } from "@/components/sign-in-button";
 import { deleteConversation, fetchConversations } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -106,6 +107,10 @@ export function AppSidebar() {
             );
           })}
         </ul>
+      </div>
+
+      <div className="border-border border-t p-4">
+        <SignInButton />
       </div>
     </aside>
   );
