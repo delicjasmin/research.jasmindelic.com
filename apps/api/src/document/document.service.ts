@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
 import { PrismaService } from "../prisma/prisma.service";
+import { ConversationService } from "../conversation/conversation.service";
 
 export const PDF_QUEUE = "pdf-processing";
 export const PDF_JOB_NAME = "process-pdf";
@@ -26,12 +27,17 @@ export class DocumentService {
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue(PDF_QUEUE) private readonly pdfQueue: Queue,
+    private readonly conversationService: ConversationService,
   ) {}
 
   async createDocument(url: string) {
     const document = await this.prisma.db.document.create({
       data: { url, status: "PENDING" },
     });
+
+    const conversation = await this.conversationService.createForDocument(
+      document.id,
+    );
 
     await this.pdfQueue.add(
       PDF_JOB_NAME,
@@ -43,7 +49,11 @@ export class DocumentService {
       },
     );
 
-    return { id: document.id, status: document.status };
+    return {
+      id: document.id,
+      conversationId: conversation.id,
+      status: document.status,
+    };
   }
 
   async getJobProgress(documentId: string): Promise<number> {

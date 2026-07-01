@@ -20,7 +20,10 @@ export type DocumentReadyEvent = {
 };
 export type DocumentErrorEvent = { documentId: string; message: string };
 export type AnswerChunkEvent = { content: string };
-export type AnswerDoneEvent = { sources: Source[] };
+export type AnswerDoneEvent = {
+  sources: Source[];
+  assistantMessageId?: string;
+};
 export type AnswerErrorEvent = { message: string };
 
 export type ResearchSocketCallbacks = {
@@ -38,7 +41,10 @@ export function useResearchSocket(
 ) {
   const socketRef = useRef<Socket | null>(null);
   const callbacksRef = useRef(callbacks);
-  callbacksRef.current = callbacks;
+
+  useEffect(() => {
+    callbacksRef.current = callbacks;
+  }, [callbacks]);
 
   useEffect(() => {
     const socket = io(API_BASE, { withCredentials: true });
@@ -73,8 +79,8 @@ export function useResearchSocket(
   }, [documentId]);
 
   const ask = useCallback(
-    (question: string) => {
-      socketRef.current?.emit("ask", { documentId, question });
+    (conversationId: string, question: string) => {
+      socketRef.current?.emit("ask", { documentId, conversationId, question });
     },
     [documentId],
   );

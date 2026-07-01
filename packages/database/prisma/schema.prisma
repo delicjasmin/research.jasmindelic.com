@@ -22,7 +22,37 @@ model Document {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  chunks DocumentChunk[]
+  chunks        DocumentChunk[]
+  conversations Conversation[]
+}
+
+model Conversation {
+  id         String   @id @default(cuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  title      String?
+  shareToken String?  @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Message[]
+
+  @@index([documentId])
+  @@index([updatedAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  content        String
+  sources        Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
 }
 
 model DocumentChunk {

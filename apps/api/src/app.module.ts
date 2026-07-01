@@ -5,6 +5,7 @@ import { AppService } from "./app.service";
 import { PrismaModule } from "./prisma/prisma.module";
 import { SearchModule } from "./search/search.module";
 import { DocumentModule } from "./document/document.module";
+import { ConversationModule } from "./conversation/conversation.module";
 import { ResearchModule } from "./research/research.module";
 
 @Module({
@@ -17,6 +18,7 @@ import { ResearchModule } from "./research/research.module";
     }),
     PrismaModule,
     SearchModule,
+    ConversationModule,
     DocumentModule,
     ResearchModule,
   ],

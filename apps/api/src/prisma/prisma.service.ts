@@ -8,7 +8,7 @@ type PrismaConnectable = {
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
-  readonly db: PrismaClientType = prisma;
+  readonly db: PrismaClientType = prisma as PrismaClientType;
 
   async onModuleInit(): Promise<void> {
     await (prisma as PrismaConnectable).$connect();

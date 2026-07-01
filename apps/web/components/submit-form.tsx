@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { submitDocument } from "@/lib/api";
 
 export function SubmitForm() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -19,8 +21,9 @@ export function SubmitForm() {
 
     setLoading(true);
     try {
-      const { id } = await submitDocument(url.trim());
-      router.push(`/document/${id}`);
+      const { conversationId } = await submitDocument(url.trim());
+      router.push(`/c/${conversationId}`);
+      void queryClient.invalidateQueries({ queryKey: ["conversations"] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to submit document");
       setLoading(false);

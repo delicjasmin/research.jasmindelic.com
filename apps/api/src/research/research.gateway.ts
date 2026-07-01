@@ -16,9 +16,17 @@ import {
   DocumentSummary,
   PDF_QUEUE,
 } from "../document/document.service";
+import {
+  ConversationService,
+  type MessageSource,
+} from "../conversation/conversation.service";
 
 type SubscribePayload = { documentId: string };
-type AskPayload = { documentId: string; question: string };
+type AskPayload = {
+  documentId: string;
+  conversationId: string;
+  question: string;
+};
 
 @WebSocketGateway({
   cors: {
@@ -40,6 +48,7 @@ export class ResearchGateway
   constructor(
     private readonly searchService: SearchService,
     private readonly documentService: DocumentService,
+    private readonly conversationService: ConversationService,
   ) {}
 
   afterInit() {
@@ -137,34 +146,57 @@ export class ResearchGateway
     @MessageBody() payload: AskPayload,
     @ConnectedSocket() client: Socket,
   ): Promise<void> {
-    const { documentId, question } = payload;
+    const { documentId, conversationId, question } = payload;
 
     try {
+      await this.conversationService.addUserMessage(conversationId, question);
+
       const chunks = await this.searchService.searchByQuery(question, {
         documentId,
         limit: 5,
       });
 
       if (chunks.length === 0) {
-        client.emit("answer:chunk", {
-          content:
-            "I couldn't find relevant passages in this document to answer that question.",
+        const fallback =
+          "I couldn't find relevant passages in this document to answer that question.";
+        client.emit("answer:chunk", { content: fallback });
+        const assistantMessage: { id: string } =
+          await this.conversationService.addAssistantMessage(
+            conversationId,
+            fallback,
+            [],
+          );
+        client.emit("answer:done", {
+          sources: [],
+          userMessageId: null,
+          assistantMessageId: assistantMessage.id,
         });
-        client.emit("answer:done", { sources: [] });
         return;
       }
 
+      let fullAnswer = "";
       for await (const token of streamAnswer(question, chunks)) {
+        fullAnswer += token;
         client.emit("answer:chunk", { content: token });
       }
 
+      const sources: MessageSource[] = chunks.map((c) => ({
+        id: c.id,
+        content: c.content,
+        pageNumber: c.pageNumber,
+        similarity: c.similarity,
+      }));
+
+      const assistantMessage: { id: string } =
+        await this.conversationService.addAssistantMessage(
+          conversationId,
+          fullAnswer,
+          sources,
+        );
+
       client.emit("answer:done", {
-        sources: chunks.map((c) => ({
-          id: c.id,
-          content: c.content,
-          pageNumber: c.pageNumber,
-          similarity: c.similarity,
-        })),
+        sources,
+        assistantMessageId: assistantMessage.id,
       });
     } catch (err) {
       this.logger.error("Error handling ask event", err);

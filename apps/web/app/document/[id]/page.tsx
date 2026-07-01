@@ -1,14 +1,17 @@
-import { Suspense } from "react";
-import { fetchDocument } from "@/lib/api";
-import { DocumentView } from "./document-view";
+import { redirect } from "next/navigation";
+import { fetchConversations } from "@/lib/api";
 
-export default async function DocumentPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DocumentRedirectPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
-  const document = await fetchDocument(id).catch(() => null);
+  const conversations = await fetchConversations(id).catch(() => []);
 
-  return (
-    <Suspense>
-      <DocumentView documentId={id} initialDocument={document} />
-    </Suspense>
-  );
+  if (conversations[0]) {
+    redirect(`/c/${conversations[0].id}`);
+  }
+
+  redirect("/");
 }
