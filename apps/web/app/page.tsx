@@ -1,11 +1,17 @@
-import Image from "next/image";
+import { SubmitForm } from "@/components/submit-form";
 
-export default async function Home() {
+export default function Home() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex w-full max-w-3xl flex-1 flex-col items-center justify-between bg-white px-16 py-32 sm:items-start dark:bg-black">
-        <Image src="/logo.png" alt="Logo" width={100} height={100} />
-      </main>
+    <div className="flex flex-1 flex-col items-center justify-center min-h-screen px-4 bg-background">
+      <div className="w-full max-w-lg space-y-8">
+        <div className="space-y-2 text-center">
+          <h1 className="text-3xl font-semibold tracking-tight">Research</h1>
+          <p className="text-muted-foreground text-sm">
+            Paste a PDF link to analyse it with AI, then ask any question about it.
+          </p>
+        </div>
+        <SubmitForm />
+      </div>
     </div>
   );
 }

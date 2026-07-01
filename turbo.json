@@ -10,9 +10,18 @@
       "cache": false,
       "persistent": true
     },
+    "worker#dev": {
+      "dependsOn": ["build", "^build"],
+      "cache": false,
+      "persistent": true
+    },
     "lint": {},
     "typecheck": {
       "dependsOn": ["^typecheck"]
+    },
+    "test:e2e": {
+      "dependsOn": ["^build"],
+      "cache": false
     }
   }
 }
