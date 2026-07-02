@@ -36,6 +36,7 @@ export type ConversationDetail = ConversationListItem & {
     title: string | null;
     summary: string | null;
     status: string;
+    errorMessage: string | null;
   };
 };
 
@@ -43,7 +44,20 @@ export type ConversationDetail = ConversationListItem & {
 export class ConversationService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createForDocument(documentId: string, title?: string | null) {
+  async createForDocument(
+    documentId: string,
+    userId: string,
+    title?: string | null,
+  ) {
+    const document = await this.prisma.db.document.findFirst({
+      where: { id: documentId, userId },
+      select: { id: true },
+    });
+
+    if (!document) {
+      throw new NotFoundException(`Document ${documentId} not found`);
+    }
+
     return await this.prisma.db.conversation.create({
       data: {
         documentId,
@@ -54,10 +68,16 @@ export class ConversationService {
   }
 
   async listConversations(
+    userId: string,
     documentId?: string,
   ): Promise<ConversationListItem[]> {
     const conversations = await this.prisma.db.conversation.findMany({
-      where: documentId ? { documentId } : undefined,
+      where: {
+        document: {
+          userId,
+          ...(documentId ? { id: documentId } : {}),
+        },
+      },
       orderBy: { updatedAt: "desc" },
       include: {
         document: {
@@ -81,9 +101,15 @@ export class ConversationService {
     }));
   }
 
-  async getConversation(id: string): Promise<ConversationDetail> {
-    const conversation = await this.prisma.db.conversation.findUnique({
-      where: { id },
+  async getConversation(
+    id: string,
+    userId: string,
+  ): Promise<ConversationDetail> {
+    const conversation = await this.prisma.db.conversation.findFirst({
+      where: {
+        id,
+        document: { userId },
+      },
       include: {
         document: {
           select: {
@@ -92,6 +118,7 @@ export class ConversationService {
             title: true,
             summary: true,
             status: true,
+            errorMessage: true,
           },
         },
         messages: {
@@ -104,24 +131,7 @@ export class ConversationService {
       throw new NotFoundException(`Conversation ${id} not found`);
     }
 
-    return {
-      id: conversation.id,
-      title: conversation.title,
-      documentId: conversation.documentId,
-      documentTitle: conversation.document.title,
-      documentStatus: conversation.document.status,
-      shareToken: conversation.shareToken,
-      updatedAt: conversation.updatedAt,
-      createdAt: conversation.createdAt,
-      document: conversation.document,
-      messages: conversation.messages.map((message) => ({
-        id: message.id,
-        role: message.role,
-        content: message.content,
-        sources: message.sources as MessageSource[] | null,
-        createdAt: message.createdAt,
-      })),
-    };
+    return this.toConversationDetail(conversation);
   }
 
   async getSharedConversation(token: string): Promise<ConversationDetail> {
@@ -135,6 +145,7 @@ export class ConversationService {
             title: true,
             summary: true,
             status: true,
+            errorMessage: true,
           },
         },
         messages: {
@@ -147,6 +158,32 @@ export class ConversationService {
       throw new NotFoundException("Shared conversation not found");
     }
 
+    return this.toConversationDetail(conversation);
+  }
+
+  private toConversationDetail(conversation: {
+    id: string;
+    title: string | null;
+    documentId: string;
+    shareToken: string | null;
+    updatedAt: Date;
+    createdAt: Date;
+    document: {
+      id: string;
+      url: string;
+      title: string | null;
+      summary: string | null;
+      status: string;
+      errorMessage: string | null;
+    };
+    messages: Array<{
+      id: string;
+      role: string;
+      content: string;
+      sources: unknown;
+      createdAt: Date;
+    }>;
+  }): ConversationDetail {
     return {
       id: conversation.id,
       title: conversation.title,
@@ -167,7 +204,26 @@ export class ConversationService {
     };
   }
 
-  async updateTitle(id: string, title: string) {
+  async assertConversationOwner(
+    conversationId: string,
+    userId: string,
+  ): Promise<void> {
+    const conversation = await this.prisma.db.conversation.findFirst({
+      where: {
+        id: conversationId,
+        document: { userId },
+      },
+      select: { id: true },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException(`Conversation ${conversationId} not found`);
+    }
+  }
+
+  async updateTitle(id: string, userId: string, title: string) {
+    await this.assertConversationOwner(id, userId);
+
     const conversation = await this.prisma.db.conversation.update({
       where: { id },
       data: { title },
@@ -177,12 +233,15 @@ export class ConversationService {
     return conversation;
   }
 
-  async deleteConversation(id: string) {
+  async deleteConversation(id: string, userId: string) {
+    await this.assertConversationOwner(id, userId);
     await this.prisma.db.conversation.delete({ where: { id } });
     return { id };
   }
 
-  async enableSharing(id: string) {
+  async enableSharing(id: string, userId: string) {
+    await this.assertConversationOwner(id, userId);
+
     const existing = await this.prisma.db.conversation.findUnique({
       where: { id },
       select: { shareToken: true },
@@ -206,7 +265,9 @@ export class ConversationService {
     return { shareToken: conversation.shareToken };
   }
 
-  async disableSharing(id: string) {
+  async disableSharing(id: string, userId: string) {
+    await this.assertConversationOwner(id, userId);
+
     await this.prisma.db.conversation.update({
       where: { id },
       data: { shareToken: null },
@@ -218,7 +279,12 @@ export class ConversationService {
   async addUserMessage(
     conversationId: string,
     content: string,
+    userId?: string,
   ): Promise<{ id: string }> {
+    if (userId) {
+      await this.assertConversationOwner(conversationId, userId);
+    }
+
     const message = await this.prisma.db.message.create({
       data: {
         conversationId,

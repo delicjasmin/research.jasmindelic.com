@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { io, type Socket } from "socket.io-client";
+import { authClient } from "@/lib/auth-client";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -38,6 +39,7 @@ export type ResearchSocketCallbacks = {
 export function useResearchSocket(
   documentId: string,
   callbacks: ResearchSocketCallbacks,
+  enabled = true,
 ) {
   const socketRef = useRef<Socket | null>(null);
   const callbacksRef = useRef(callbacks);
@@ -47,36 +49,50 @@ export function useResearchSocket(
   }, [callbacks]);
 
   useEffect(() => {
-    const socket = io(API_BASE, { withCredentials: true });
-    socketRef.current = socket;
+    if (!enabled) return;
 
-    socket.on("connect", () => {
-      socket.emit("subscribe-document", { documentId });
-    });
+    let cancelled = false;
 
-    socket.on("document:progress", (e: DocumentProgressEvent) =>
-      callbacksRef.current.onProgress?.(e),
-    );
-    socket.on("document:ready", (e: DocumentReadyEvent) =>
-      callbacksRef.current.onReady?.(e),
-    );
-    socket.on("document:error", (e: DocumentErrorEvent) =>
-      callbacksRef.current.onDocumentError?.(e),
-    );
-    socket.on("answer:chunk", (e: AnswerChunkEvent) =>
-      callbacksRef.current.onAnswerChunk?.(e),
-    );
-    socket.on("answer:done", (e: AnswerDoneEvent) =>
-      callbacksRef.current.onAnswerDone?.(e),
-    );
-    socket.on("answer:error", (e: AnswerErrorEvent) =>
-      callbacksRef.current.onAnswerError?.(e),
-    );
+    async function connect() {
+      const session = await authClient.getSession();
+      const token = session.data?.session?.token;
+      if (!token || cancelled) return;
+
+      const socket = io(API_BASE, { auth: { token } });
+      socketRef.current = socket;
+
+      socket.on("connect", () => {
+        socket.emit("subscribe-document", { documentId });
+      });
+
+      socket.on("document:progress", (e: DocumentProgressEvent) =>
+        callbacksRef.current.onProgress?.(e),
+      );
+      socket.on("document:ready", (e: DocumentReadyEvent) =>
+        callbacksRef.current.onReady?.(e),
+      );
+      socket.on("document:error", (e: DocumentErrorEvent) =>
+        callbacksRef.current.onDocumentError?.(e),
+      );
+      socket.on("answer:chunk", (e: AnswerChunkEvent) =>
+        callbacksRef.current.onAnswerChunk?.(e),
+      );
+      socket.on("answer:done", (e: AnswerDoneEvent) =>
+        callbacksRef.current.onAnswerDone?.(e),
+      );
+      socket.on("answer:error", (e: AnswerErrorEvent) =>
+        callbacksRef.current.onAnswerError?.(e),
+      );
+    }
+
+    void connect();
 
     return () => {
-      socket.disconnect();
+      cancelled = true;
+      socketRef.current?.disconnect();
+      socketRef.current = null;
     };
-  }, [documentId]);
+  }, [documentId, enabled]);
 
   const ask = useCallback(
     (conversationId: string, question: string) => {

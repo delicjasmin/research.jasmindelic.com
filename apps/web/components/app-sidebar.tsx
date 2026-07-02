@@ -6,8 +6,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SignInButton } from "@/components/sign-in-button";
+import { authClient } from "@/lib/auth-client";
 import { deleteConversation, fetchConversations } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { PlusSignIcon } from "@hugeicons/core-free-icons";
+import Image from "next/image";
 
 function formatRelativeTime(date: string) {
   const diff = Date.now() - new Date(date).getTime();
@@ -25,10 +29,12 @@ export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: session } = authClient.useSession();
 
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ["conversations"],
     queryFn: () => fetchConversations(),
+    enabled: !!session,
   });
 
   const deleteMutation = useMutation({
@@ -45,15 +51,23 @@ export function AppSidebar() {
 
   return (
     <aside className="bg-muted/30 border-border flex h-full w-64 shrink-0 flex-col border-r">
-      <div className="border-border border-b p-4">
+      <div className="border-border space-y-4 border-b p-4">
         <Link
           href="/"
-          className="mb-4 block text-lg font-semibold tracking-tight"
+          className="flex items-center gap-2 text-lg font-semibold tracking-tight"
         >
-          Research
+          <Image src="/logo.png" alt="Research" width={32} height={32} />
+          AI Research
         </Link>
         <Button asChild className="w-full" size="sm">
-          <Link href="/">+ New research</Link>
+          <Link href="/">
+            <HugeiconsIcon
+              icon={PlusSignIcon}
+              strokeWidth={2}
+              className="mr-1 h-4 w-4"
+            />
+            New research
+          </Link>
         </Button>
       </div>
 
@@ -62,11 +76,17 @@ export function AppSidebar() {
           Conversations
         </p>
 
-        {isLoading && (
+        {!session && (
+          <p className="text-muted-foreground px-2 py-4 text-sm">
+            Sign in to see your conversations.
+          </p>
+        )}
+
+        {session && isLoading && (
           <p className="text-muted-foreground px-2 py-4 text-sm">Loading…</p>
         )}
 
-        {!isLoading && conversations.length === 0 && (
+        {session && !isLoading && conversations.length === 0 && (
           <p className="text-muted-foreground px-2 py-4 text-sm">
             No conversations yet. Start by analysing a PDF.
           </p>

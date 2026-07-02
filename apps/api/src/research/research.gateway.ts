@@ -10,6 +10,8 @@ import { Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { QueueEvents } from "bullmq";
 import { streamAnswer } from "ai";
+import { AuthService } from "../auth/auth.service";
+import type { AuthUser } from "../auth/auth.types";
 import { SearchService } from "../search/search.service";
 import {
   DocumentService,
@@ -20,12 +22,17 @@ import {
   ConversationService,
   type MessageSource,
 } from "../conversation/conversation.service";
+import { UsageService } from "../usage/usage.service";
 
 type SubscribePayload = { documentId: string };
 type AskPayload = {
   documentId: string;
   conversationId: string;
   question: string;
+};
+
+type SocketData = {
+  user?: AuthUser;
 };
 
 @WebSocketGateway({
@@ -46,12 +53,38 @@ export class ResearchGateway
   private queueEvents!: QueueEvents;
 
   constructor(
+    private readonly authService: AuthService,
     private readonly searchService: SearchService,
     private readonly documentService: DocumentService,
     private readonly conversationService: ConversationService,
+    private readonly usageService: UsageService,
   ) {}
 
-  afterInit() {
+  afterInit(server: Server) {
+    server.use((socket, next) => {
+      const token = (socket.handshake.auth as { token?: unknown } | undefined)
+        ?.token;
+      if (typeof token !== "string") {
+        next(new Error("Authentication required"));
+        return;
+      }
+
+      this.authService
+        .validateSessionToken(token)
+        .then((user) => {
+          if (!user) {
+            next(new Error("Invalid or expired session"));
+            return;
+          }
+
+          (socket.data as SocketData).user = user;
+          next();
+        })
+        .catch((err: unknown) => {
+          next(err instanceof Error ? err : new Error("Authentication failed"));
+        });
+    });
+
     this.logger.log("WebSocket gateway initialised");
   }
 
@@ -102,18 +135,32 @@ export class ResearchGateway
     await this.queueEvents?.close();
   }
 
+  private getSocketUser(client: Socket): AuthUser {
+    const user = (client.data as SocketData).user;
+    if (!user) {
+      throw new Error("Authentication required");
+    }
+    return user;
+  }
+
   @SubscribeMessage("subscribe-document")
   async handleSubscribe(
     @MessageBody() payload: SubscribePayload,
     @ConnectedSocket() client: Socket,
   ) {
     const { documentId } = payload;
-    void client.join(documentId);
-    this.logger.log(`Client ${client.id} subscribed to document ${documentId}`);
+    const user = this.getSocketUser(client);
 
     try {
-      const doc: DocumentSummary =
-        await this.documentService.getDocument(documentId);
+      const doc = await this.documentService.getDocumentForUser(
+        documentId,
+        user.id,
+      );
+
+      void client.join(documentId);
+      this.logger.log(
+        `Client ${client.id} subscribed to document ${documentId}`,
+      );
 
       if (doc.status === "READY") {
         client.emit("document:ready", {
@@ -127,7 +174,7 @@ export class ResearchGateway
       if (doc.status === "FAILED") {
         client.emit("document:error", {
           documentId,
-          message: "Processing failed",
+          message: doc.errorMessage ?? "Processing failed",
         });
         return;
       }
@@ -138,6 +185,10 @@ export class ResearchGateway
       }
     } catch (err) {
       this.logger.error(`Failed to sync document state for ${documentId}`, err);
+      client.emit("document:error", {
+        documentId,
+        message: err instanceof Error ? err.message : "Access denied",
+      });
     }
   }
 
@@ -147,9 +198,16 @@ export class ResearchGateway
     @ConnectedSocket() client: Socket,
   ): Promise<void> {
     const { documentId, conversationId, question } = payload;
+    const user = this.getSocketUser(client);
 
     try {
-      await this.conversationService.addUserMessage(conversationId, question);
+      await this.documentService.assertDocumentOwner(documentId, user.id);
+      await this.usageService.assertWithinDailyQuestionLimit(user.id);
+      await this.conversationService.addUserMessage(
+        conversationId,
+        question,
+        user.id,
+      );
 
       const chunks = await this.searchService.searchByQuery(question, {
         documentId,

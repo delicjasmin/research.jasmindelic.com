@@ -3,9 +3,14 @@ import { BullModule } from "@nestjs/bullmq";
 import { DocumentController } from "./document.controller";
 import { DocumentService, PDF_QUEUE } from "./document.service";
 import { ConversationModule } from "../conversation/conversation.module";
+import { UsageModule } from "../usage/usage.module";
 
 @Module({
-  imports: [BullModule.registerQueue({ name: PDF_QUEUE }), ConversationModule],
+  imports: [
+    BullModule.registerQueue({ name: PDF_QUEUE }),
+    ConversationModule,
+    UsageModule,
+  ],
   controllers: [DocumentController],
   providers: [DocumentService],
   exports: [DocumentService],

@@ -13,17 +13,25 @@ datasource db {
 }
 
 model Document {
-  id      String  @id @default(cuid())
-  url     String
-  title   String?
-  summary String?
-  status  String  @default("PENDING")
+  id            String  @id @default(cuid())
+  url           String
+  title         String?
+  summary       String?
+  status        String  @default("PENDING")
+  errorMessage  String?
+  pageCount     Int?
+  fileSizeBytes Int?
+  userId        String
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   chunks        DocumentChunk[]
   conversations Conversation[]
+
+  @@index([userId])
+  @@index([userId, createdAt])
 }
 
 model Conversation {
@@ -61,10 +69,12 @@ model User {
   email         String
   emailVerified Boolean   @default(false)
   image         String?
+  plan          String    @default("free")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
+  documents     Document[]
 
   @@unique([email])
   @@map("user")

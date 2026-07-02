@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { UsageLimits } from "@/components/usage-limits";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,7 +60,9 @@ export function ConversationView({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const { ask } = useResearchSocket(document.id, {
+  const { ask } = useResearchSocket(
+    document.id,
+    {
     onProgress: useCallback(({ progress: p }: DocumentProgressEvent) => {
       setProgress(p);
       setConversation((prev) => ({
@@ -86,7 +89,11 @@ export function ConversationView({
       toast.error(`Processing failed: ${message}`);
       setConversation((prev) => ({
         ...prev,
-        document: { ...prev.document, status: "FAILED" },
+        document: {
+          ...prev.document,
+          status: "FAILED",
+          errorMessage: message,
+        },
       }));
     }, []),
 
@@ -125,6 +132,7 @@ export function ConversationView({
         void queryClient.invalidateQueries({
           queryKey: ["conversation", conversationId],
         });
+        void queryClient.invalidateQueries({ queryKey: ["usage"] });
       },
       [conversationId, queryClient],
     ),
@@ -134,7 +142,9 @@ export function ConversationView({
       toast.error(message);
       setMessages((prev) => prev.filter((m) => !m.streaming));
     }, []),
-  });
+  },
+    !readOnly,
+  );
 
   async function handleShare() {
     setIsSharing(true);
@@ -242,6 +252,14 @@ export function ConversationView({
         </div>
       </div>
 
+      {document.status === "FAILED" && document.errorMessage && (
+        <Card className="border-destructive/40">
+          <CardContent className="pt-5">
+            <p className="text-destructive text-sm">{document.errorMessage}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {isProcessing && (
         <Card>
           <CardContent className="space-y-3 pt-5">
@@ -320,6 +338,9 @@ export function ConversationView({
                 {isAsking ? "…" : "Ask"}
               </Button>
             </form>
+          )}
+          {!readOnly && isReady && (
+            <UsageLimits className="text-center" />
           )}
         </div>
       )}

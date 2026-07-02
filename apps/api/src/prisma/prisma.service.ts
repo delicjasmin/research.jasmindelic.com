@@ -1,5 +1,5 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
-import { prisma, type PrismaClientType } from "database";
+import { prisma, type PrismaClient } from "database";
 
 type PrismaConnectable = {
   $connect: () => Promise<void>;
@@ -8,7 +8,7 @@ type PrismaConnectable = {
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
-  readonly db: PrismaClientType = prisma as PrismaClientType;
+  readonly db: PrismaClient = prisma as PrismaClient;
 
   async onModuleInit(): Promise<void> {
     await (prisma as PrismaConnectable).$connect();
@@ -19,4 +19,4 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   }
 }
 
-export type { PrismaClientType };
+export type { PrismaClient };
