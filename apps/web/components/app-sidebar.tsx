@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SignInButton } from "@/components/sign-in-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { authClient } from "@/lib/auth-client";
 import { deleteConversation, fetchConversations } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -25,7 +26,12 @@ function formatRelativeTime(date: string) {
   return new Date(date).toLocaleDateString();
 }
 
-export function AppSidebar() {
+type SidebarContentProps = {
+  onNavigate?: () => void;
+  className?: string;
+};
+
+export function SidebarContent({ onNavigate, className }: SidebarContentProps) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -50,17 +56,18 @@ export function AppSidebar() {
   });
 
   return (
-    <aside className="bg-muted/30 border-border flex h-full w-64 shrink-0 flex-col border-r">
+    <div className={cn("flex h-full flex-col", className)}>
       <div className="border-border space-y-4 border-b p-4">
         <Link
           href="/"
+          onClick={onNavigate}
           className="flex items-center gap-2 text-lg font-semibold tracking-tight"
         >
           <Image src="/logo.png" alt="Research" width={32} height={32} />
           AI Research
         </Link>
         <Button asChild className="w-full" size="sm">
-          <Link href="/">
+          <Link href="/" onClick={onNavigate}>
             <HugeiconsIcon
               icon={PlusSignIcon}
               strokeWidth={2}
@@ -108,7 +115,11 @@ export function AppSidebar() {
                       : "hover:bg-background/70",
                   )}
                 >
-                  <Link href={href} className="min-w-0 flex-1">
+                  <Link
+                    href={href}
+                    onClick={onNavigate}
+                    className="min-w-0 flex-1"
+                  >
                     <p className="truncate text-sm font-medium">{label}</p>
                     <p className="text-muted-foreground truncate text-xs">
                       {formatRelativeTime(conversation.updatedAt)}
@@ -129,9 +140,18 @@ export function AppSidebar() {
         </ul>
       </div>
 
-      <div className="border-border border-t p-4">
+      <div className="border-border space-y-2 border-t p-4">
+        <ThemeToggle />
         <SignInButton />
       </div>
+    </div>
+  );
+}
+
+export function AppSidebar() {
+  return (
+    <aside className="bg-muted/30 border-border hidden h-full w-64 shrink-0 flex-col border-r md:flex">
+      <SidebarContent />
     </aside>
   );
 }

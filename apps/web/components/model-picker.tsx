@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ChatModelOption } from "@/lib/api";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ChevronDown } from "@hugeicons/core-free-icons";
 
 type Props = {
   models: ChatModelOption[];
@@ -23,7 +25,10 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
     null;
 
   const hovered =
-    models.find((model) => model.id === hoveredId) ?? selected ?? models[0] ?? null;
+    models.find((model) => model.id === hoveredId) ??
+    selected ??
+    models[0] ??
+    null;
 
   useEffect(() => {
     if (!open) return;
@@ -55,20 +60,17 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
     <div ref={containerRef} className="relative">
       <Button
         type="button"
-        variant="outline"
+        variant="ghost"
         size="sm"
         disabled={disabled}
         aria-expanded={open}
         aria-haspopup="listbox"
         onClick={() => setOpen((current) => !current)}
-        className="text-muted-foreground hover:text-foreground h-7 min-w-36 justify-between gap-2 px-2 font-normal"
+        className="text-muted-foreground hover:text-foreground h-7 min-w-24 justify-between gap-2 rounded-full px-2 font-normal md:text-sm"
       >
         <span className="truncate">
           {selected ? (
-            <>
-              <span className="text-foreground">{selected.label}</span>
-              <span className="text-muted-foreground"> · {selected.hint}</span>
-            </>
+            <span className="text-foreground">{selected.label}</span>
           ) : (
             "Select model"
           )}
@@ -80,7 +82,7 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
             open && "rotate-180",
           )}
         >
-          ▾
+          <HugeiconsIcon icon={ChevronDown} strokeWidth={2} />
         </span>
       </Button>
 
@@ -131,12 +133,15 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
                       {model.hint}
                     </span>
                     {model.disabledReason === "pro" && (
-                      <span className="bg-muted text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-medium uppercase tracking-wide">
+                      <span className="bg-muted text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-medium tracking-wide uppercase">
                         Pro
                       </span>
                     )}
                     {isSelected && !isDisabled && (
-                      <span aria-hidden className="text-foreground shrink-0 text-xs">
+                      <span
+                        aria-hidden
+                        className="text-foreground shrink-0 text-xs"
+                      >
                         ✓
                       </span>
                     )}

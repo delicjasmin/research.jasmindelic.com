@@ -4,11 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { UsageLimits } from "@/components/usage-limits";
-import { ModelPicker } from "@/components/model-picker";
-import { Textarea } from "@/components/ui/textarea";
+import { ChatComposer } from "@/components/chat-composer";
+import { DocumentSummary } from "@/components/document-summary";
+import { MarkdownContent } from "@/components/markdown-content";
 import { Progress } from "@/components/ui/progress";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
+import { Spinner } from "@/components/ui/spinner";
 import {
   useResearchSocket,
   type Source,
@@ -37,6 +39,13 @@ type Props = {
   readOnly?: boolean;
 };
 
+function getProcessingLabel(progress: number) {
+  if (progress < 25) return "Downloading PDF…";
+  if (progress < 50) return "Parsing and chunking…";
+  if (progress < 82) return "Generating embeddings…";
+  return "Summarising…";
+}
+
 export function ConversationView({
   conversationId,
   initialConversation,
@@ -63,7 +72,10 @@ export function ConversationView({
   const models = modelsData?.models ?? [];
   const selectableModels = models.filter((model) => model.available);
   const preferredModelId =
-    selectedModelId ?? modelsData?.defaultModelId ?? selectableModels[0]?.id ?? null;
+    selectedModelId ??
+    modelsData?.defaultModelId ??
+    selectableModels[0]?.id ??
+    null;
   const activeModelId = selectableModels.some(
     (model) => model.id === preferredModelId,
   )
@@ -82,86 +94,89 @@ export function ConversationView({
   const { ask } = useResearchSocket(
     document.id,
     {
-    onProgress: useCallback(({ progress: p }: DocumentProgressEvent) => {
-      setProgress(p);
-      setConversation((prev) => ({
-        ...prev,
-        document: { ...prev.document, status: "PROCESSING" },
-      }));
-    }, []),
+      onProgress: useCallback(({ progress: p }: DocumentProgressEvent) => {
+        setProgress(p);
+        setConversation((prev) => ({
+          ...prev,
+          document: { ...prev.document, status: "PROCESSING" },
+        }));
+      }, []),
 
-    onReady: useCallback(({ summary, title }: DocumentReadyEvent) => {
-      setProgress(100);
-      setConversation((prev) => ({
-        ...prev,
-        document: {
-          ...prev.document,
-          status: "READY",
-          summary: summary ?? prev.document.summary,
-          title: title ?? prev.document.title,
+      onReady: useCallback(
+        ({ summary, title }: DocumentReadyEvent) => {
+          setProgress(100);
+          setConversation((prev) => ({
+            ...prev,
+            document: {
+              ...prev.document,
+              status: "READY",
+              summary: summary ?? prev.document.summary,
+              title: title ?? prev.document.title,
+            },
+          }));
+          void queryClient.invalidateQueries({ queryKey: ["conversations"] });
         },
-      }));
-      void queryClient.invalidateQueries({ queryKey: ["conversations"] });
-    }, [queryClient]),
+        [queryClient],
+      ),
 
-    onDocumentError: useCallback(({ message }: DocumentErrorEvent) => {
-      toast.error(`Processing failed: ${message}`);
-      setConversation((prev) => ({
-        ...prev,
-        document: {
-          ...prev.document,
-          status: "FAILED",
-          errorMessage: message,
-        },
-      }));
-    }, []),
+      onDocumentError: useCallback(({ message }: DocumentErrorEvent) => {
+        toast.error(`Processing failed: ${message}`);
+        setConversation((prev) => ({
+          ...prev,
+          document: {
+            ...prev.document,
+            status: "FAILED",
+            errorMessage: message,
+          },
+        }));
+      }, []),
 
-    onAnswerChunk: useCallback(({ content }: AnswerChunkEvent) => {
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last?.streaming) {
-          return [
-            ...prev.slice(0, -1),
-            { ...last, content: last.content + content },
-          ];
-        }
-        return prev;
-      });
-    }, []),
-
-    onAnswerDone: useCallback(
-      ({ sources, assistantMessageId }: AnswerDoneEvent) => {
-        setIsAsking(false);
+      onAnswerChunk: useCallback(({ content }: AnswerChunkEvent) => {
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last?.streaming) {
             return [
               ...prev.slice(0, -1),
-              {
-                ...last,
-                id: assistantMessageId ?? last.id,
-                streaming: false,
-                sources,
-              },
+              { ...last, content: last.content + content },
             ];
           }
           return prev;
         });
-        void queryClient.invalidateQueries({ queryKey: ["conversations"] });
-        void queryClient.invalidateQueries({
-          queryKey: ["conversation", conversationId],
-        });
-        void queryClient.invalidateQueries({ queryKey: ["usage"] });
-      },
-      [conversationId, queryClient],
-    ),
+      }, []),
 
-    onAnswerError: useCallback(({ message }: AnswerErrorEvent) => {
-      setIsAsking(false);
-      toast.error(message);
-      setMessages((prev) => prev.filter((m) => !m.streaming));
-    }, []),
-  },
+      onAnswerDone: useCallback(
+        ({ sources, assistantMessageId }: AnswerDoneEvent) => {
+          setIsAsking(false);
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.streaming) {
+              return [
+                ...prev.slice(0, -1),
+                {
+                  ...last,
+                  id: assistantMessageId ?? last.id,
+                  streaming: false,
+                  sources,
+                },
+              ];
+            }
+            return prev;
+          });
+          void queryClient.invalidateQueries({ queryKey: ["conversations"] });
+          void queryClient.invalidateQueries({
+            queryKey: ["conversation", conversationId],
+          });
+          void queryClient.invalidateQueries({ queryKey: ["usage"] });
+        },
+        [conversationId, queryClient],
+      ),
+
+      onAnswerError: useCallback(({ message }: AnswerErrorEvent) => {
+        setIsAsking(false);
+        toast.error(message);
+        setMessages((prev) => prev.filter((m) => !m.streaming));
+      }, []),
+    },
     !readOnly,
   );
 
@@ -232,21 +247,18 @@ export function ConversationView({
     ask(conversationId, q, activeModelId);
   }
 
-  const title =
-    conversation.title ??
-    document.title ??
-    "Analysing document…";
+  const title = conversation.title ?? document.title ?? "Analysing document…";
 
   return (
-    <div className="mx-auto flex min-h-full max-w-3xl flex-col gap-6 px-4 py-8">
-      <div className="flex items-start justify-between gap-4">
+    <div className="mx-auto flex min-h-full max-w-3xl flex-col gap-6 px-3 py-4 md:px-4 md:py-8 lg:w-3xl">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <h1 className="truncate font-semibold">{title}</h1>
           <p className="text-muted-foreground truncate font-mono text-xs">
             {document.url}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2 self-start">
           {!readOnly && (
             <>
               <Button
@@ -254,8 +266,19 @@ export function ConversationView({
                 size="sm"
                 onClick={handleShare}
                 disabled={isSharing || !isReady}
+                className="hidden sm:inline-flex"
               >
                 {conversation.shareToken ? "Copy link" : "Share"}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={handleShare}
+                disabled={isSharing || !isReady}
+                className="sm:hidden"
+                aria-label={conversation.shareToken ? "Copy link" : "Share"}
+              >
+                <span aria-hidden>↗</span>
               </Button>
               {conversation.shareToken && (
                 <Button
@@ -263,6 +286,7 @@ export function ConversationView({
                   size="sm"
                   onClick={handleUnshare}
                   disabled={isSharing}
+                  className="hidden sm:inline-flex"
                 >
                   Unshare
                 </Button>
@@ -284,107 +308,78 @@ export function ConversationView({
       {isProcessing && (
         <Card>
           <CardContent className="space-y-3 pt-5">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                {progress < 25
-                  ? "Downloading PDF…"
-                  : progress < 50
-                    ? "Parsing and chunking…"
-                    : progress < 82
-                      ? "Generating embeddings…"
-                      : "Summarising…"}
-              </span>
-              <span className="font-mono text-xs tabular-nums">
+            <Marker role="status" variant="border">
+              <MarkerIcon>
+                <Spinner className="size-3.5" />
+              </MarkerIcon>
+              <MarkerContent className="shimmer">
+                {getProcessingLabel(progress)}
+              </MarkerContent>
+              <span className="ml-auto font-mono text-xs tabular-nums">
                 {progress}%
               </span>
-            </div>
+            </Marker>
             <Progress value={progress} />
           </CardContent>
         </Card>
       )}
 
       {isReady && document.summary && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-sm font-medium tracking-wide uppercase">
-              Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">
-              {document.summary}
-            </p>
-          </CardContent>
-        </Card>
+        <DocumentSummary
+          summary={document.summary}
+          hasMessages={messages.length > 0}
+        />
       )}
 
       {(isReady || readOnly) && (
         <div className="flex flex-1 flex-col gap-4">
           <div className="flex flex-1 flex-col gap-4">
             {messages.length === 0 && !readOnly && (
-              <p className="text-muted-foreground py-8 text-center text-sm">
+              <p className="text-muted-foreground py-2 text-center text-sm">
                 Ask a question about this document.
               </p>
             )}
-            {messages.map((msg) => (
-              <MessageBubble
-                key={msg.id}
-                message={msg}
-                modelLabel={
-                  msg.model
-                    ? (() => {
-                        const model = models.find((m) => m.id === msg.model);
-                        return model
-                          ? `${model.label} · ${model.hint}`
-                          : msg.model;
-                      })()
-                    : null
-                }
-              />
-            ))}
+            {messages.map((msg, index) => {
+              const showStreamingMarker =
+                msg.streaming && !msg.content && msg.role === "assistant";
+              const prevMsg = index > 0 ? messages[index - 1] : null;
+
+              return (
+                <div key={msg.id} className="flex flex-col gap-2">
+                  {showStreamingMarker && prevMsg?.role === "user" && (
+                    <StreamingMarker />
+                  )}
+                  <MessageBubble
+                    message={msg}
+                    modelLabel={
+                      msg.model
+                        ? (() => {
+                            const model = models.find(
+                              (m) => m.id === msg.model,
+                            );
+                            return model
+                              ? `${model.label} · ${model.hint}`
+                              : msg.model;
+                          })()
+                        : null
+                    }
+                  />
+                </div>
+              );
+            })}
             <div ref={messagesEndRef} />
           </div>
 
           {!readOnly && isReady && (
-            <form
+            <ChatComposer
+              question={question}
+              onQuestionChange={setQuestion}
               onSubmit={handleAsk}
-              className="sticky bottom-4 flex flex-col gap-2"
-            >
-              <div className="flex items-end gap-2">
-                <Textarea
-                  placeholder="Ask a question about this document…"
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  disabled={isAsking}
-                  className="max-h-40 min-h-11 resize-none text-sm"
-                  rows={1}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleAsk(e);
-                    }
-                  }}
-                />
-                <Button
-                  type="submit"
-                  disabled={isAsking || !question.trim() || !activeModelId}
-                  className="shrink-0"
-                >
-                  {isAsking ? "…" : "Ask"}
-                </Button>
-              </div>
-              {models.length > 0 && (
-                <ModelPicker
-                  models={models}
-                  value={activeModelId}
-                  onChange={setSelectedModelId}
-                  disabled={isAsking}
-                />
-              )}
-            </form>
-          )}
-          {!readOnly && isReady && (
-            <UsageLimits className="text-center" />
+              isAsking={isAsking}
+              models={models}
+              activeModelId={activeModelId}
+              onModelChange={setSelectedModelId}
+            />
           )}
         </div>
       )}
@@ -398,22 +393,31 @@ export function ConversationView({
   );
 }
 
+function StreamingMarker() {
+  return (
+    <Marker role="status" className="pl-1">
+      <MarkerIcon>
+        <Spinner className="size-3.5" />
+      </MarkerIcon>
+      <MarkerContent className="shimmer">Thinking…</MarkerContent>
+    </Marker>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; className: string }> = {
     PENDING: { label: "Pending", className: "bg-muted text-muted-foreground" },
     PROCESSING: {
       label: "Processing",
-      className:
-        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+      className: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
     },
     READY: {
       label: "Ready",
-      className:
-        "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+      className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
     },
     FAILED: {
       label: "Failed",
-      className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+      className: "bg-red-500/15 text-red-700 dark:text-red-400",
     },
   };
   const { label, className } = map[status] ?? map.PENDING;
@@ -436,6 +440,11 @@ function MessageBubble({
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const isUser = message.role === "user";
   const sources = message.sources as Source[] | null;
+  const isEmptyStreaming = message.streaming && !message.content;
+
+  if (isEmptyStreaming) {
+    return null;
+  }
 
   return (
     <div
@@ -445,11 +454,14 @@ function MessageBubble({
         className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
           isUser
             ? "bg-primary text-primary-foreground rounded-br-sm"
-            : "bg-muted text-foreground rounded-bl-sm"
+            : `bg-muted text-foreground rounded-bl-sm${message.streaming ? "ring-border/60 ring-1" : ""}`
         }`}
       >
-        {message.content ||
-          (message.streaming ? <span className="opacity-50">●●●</span> : null)}
+        {isUser ? (
+          message.content
+        ) : (
+          <MarkdownContent content={message.content} className="text-sm" />
+        )}
       </div>
 
       {!isUser && !message.streaming && modelLabel && (
@@ -481,9 +493,10 @@ function MessageBubble({
                     </span>
                     <span>{Math.round(source.similarity * 100)}% match</span>
                   </div>
-                  <p className="text-foreground/80 line-clamp-4 leading-relaxed">
-                    {source.content}
-                  </p>
+                  <MarkdownContent
+                    content={source.content}
+                    className="text-foreground/90 line-clamp-4 text-xs leading-relaxed"
+                  />
                 </div>
               ))}
             </div>

@@ -1,19 +1,9 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { QueryProvider } from "@/providers/query-client";
+import { ThemeProvider } from "@/providers/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Research — AI PDF Analysis",
@@ -26,17 +16,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={cn(
-        "h-full antialiased",
-        geistSans.variable,
-        geistMono.variable,
-      )}
-    >
+    <html lang="en" suppressHydrationWarning className="h-full antialiased">
       <body className="bg-background text-foreground flex min-h-full flex-col font-[(family-name:var(--font-geist-sans))]">
-        <QueryProvider>{children}</QueryProvider>
-        <Toaster />
+        <ThemeProvider>
+          <QueryProvider>{children}</QueryProvider>
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );
