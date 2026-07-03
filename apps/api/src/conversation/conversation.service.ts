@@ -15,6 +15,7 @@ export type ConversationMessage = {
   role: string;
   content: string;
   sources: MessageSource[] | null;
+  model: string | null;
   createdAt: Date;
 };
 
@@ -210,6 +211,7 @@ export class ConversationService {
             role: message.role,
             content: message.content,
             sources: message.sources ?? undefined,
+            model: message.model,
             createdAt: message.createdAt,
           })),
         },
@@ -283,6 +285,7 @@ export class ConversationService {
       role: string;
       content: string;
       sources: unknown;
+      model: string | null;
       createdAt: Date;
     }>;
   }): ConversationDetail {
@@ -301,6 +304,7 @@ export class ConversationService {
         role: message.role,
         content: message.content,
         sources: message.sources as MessageSource[] | null,
+        model: message.model,
         createdAt: message.createdAt,
       })),
     };
@@ -420,6 +424,7 @@ export class ConversationService {
     conversationId: string,
     content: string,
     sources: MessageSource[],
+    model?: string,
   ): Promise<{ id: string }> {
     const message = await this.prisma.db.message.create({
       data: {
@@ -427,6 +432,7 @@ export class ConversationService {
         role: "assistant",
         content,
         sources: sources.length > 0 ? sources : undefined,
+        model: model ?? null,
       },
       select: { id: true },
     });

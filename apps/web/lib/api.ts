@@ -27,6 +27,7 @@ export type ConversationMessage = {
   role: "user" | "assistant";
   content: string;
   sources: MessageSource[] | null;
+  model: string | null;
   createdAt: string;
 };
 
@@ -56,6 +57,22 @@ export type UsageSummary = {
   plan: string;
   documents: UsageQuota;
   questions: UsageQuota;
+};
+
+export type ChatModelOption = {
+  id: string;
+  label: string;
+  hint: string;
+  description: string;
+  provider: "openai" | "anthropic" | "google";
+  available: boolean;
+  disabledReason?: "pro";
+  minPlan?: "pro";
+};
+
+export type ModelsResponse = {
+  defaultModelId: string | null;
+  models: ChatModelOption[];
 };
 
 function getErrorMessage(body: { message?: string | string[] }): string {
@@ -89,6 +106,14 @@ export async function submitDocument(url: string): Promise<{
 
 export async function fetchUsage(token?: string): Promise<UsageSummary> {
   const res = await fetch(`${API_BASE}/usage`, {
+    cache: "no-store",
+    headers: await getAuthHeaders(token),
+  });
+  return handleResponse(res);
+}
+
+export async function fetchModels(token?: string): Promise<ModelsResponse> {
+  const res = await fetch(`${API_BASE}/models`, {
     cache: "no-store",
     headers: await getAuthHeaders(token),
   });

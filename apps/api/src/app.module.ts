@@ -9,6 +9,7 @@ import { DocumentModule } from "./document/document.module";
 import { ConversationModule } from "./conversation/conversation.module";
 import { ResearchModule } from "./research/research.module";
 import { UsageModule } from "./usage/usage.module";
+import { ModelsModule } from "./models/models.module";
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { UsageModule } from "./usage/usage.module";
     DocumentModule,
     ResearchModule,
     UsageModule,
+    ModelsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

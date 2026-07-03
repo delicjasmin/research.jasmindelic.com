@@ -11,3 +11,20 @@ export async function* streamAnswer(): AsyncGenerator<string> {
   yield "Mock ";
   yield "answer.";
 }
+
+export const DEFAULT_MODEL_ID = "gpt-4o-mini";
+
+export const listAvailableChatModels = () => [
+  {
+    id: "gpt-4o-mini",
+    label: "GPT-4o Mini",
+    hint: "Fast",
+    description: "Quick and affordable.",
+    provider: "openai" as const,
+    available: true,
+  },
+];
+
+export const listChatModels = listAvailableChatModels;
+
+export const resolveModelId = (modelId?: string) => modelId ?? DEFAULT_MODEL_ID;

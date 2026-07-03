@@ -1,22 +1,18 @@
-import OpenAI from "openai";
+import { streamText } from "ai-sdk";
 import type { SimilarChunkResult } from "database";
+import { DEFAULT_MODEL_ID, getChatModel, type ModelId } from "./models.js";
 
 export async function* streamAnswer(
   question: string,
   chunks: SimilarChunkResult[],
+  modelId: ModelId = DEFAULT_MODEL_ID,
 ): AsyncGenerator<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
-
-  const openai = new OpenAI({ apiKey });
-
   const context = chunks
     .map((c, i) => `[${i + 1}] (Page ${c.pageNumber}): ${c.content}`)
     .join("\n\n");
 
-  const stream = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    stream: true,
+  const result = streamText({
+    model: getChatModel(modelId),
     messages: [
       {
         role: "system",
@@ -33,8 +29,9 @@ export async function* streamAnswer(
     ],
   });
 
-  for await (const chunk of stream) {
-    const content = chunk.choices[0]?.delta?.content;
-    if (content) yield content;
+  for await (const part of result.textStream) {
+    if (part) yield part;
   }
 }
+
+export { DEFAULT_MODEL_ID };

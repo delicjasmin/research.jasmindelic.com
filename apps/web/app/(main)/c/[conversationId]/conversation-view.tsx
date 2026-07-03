@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { UsageLimits } from "@/components/usage-limits";
+import { ModelPicker } from "@/components/model-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +24,7 @@ import {
   type ConversationMessage,
   disableConversationShare,
   enableConversationShare,
+  fetchModels,
 } from "@/lib/api";
 
 type Message = ConversationMessage & {
@@ -47,9 +49,26 @@ export function ConversationView({
     initialConversation.messages,
   );
   const [question, setQuestion] = useState("");
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [isAsking, setIsAsking] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const { data: modelsData } = useQuery({
+    queryKey: ["models"],
+    queryFn: () => fetchModels(),
+    enabled: !readOnly,
+  });
+
+  const models = modelsData?.models ?? [];
+  const selectableModels = models.filter((model) => model.available);
+  const preferredModelId =
+    selectedModelId ?? modelsData?.defaultModelId ?? selectableModels[0]?.id ?? null;
+  const activeModelId = selectableModels.some(
+    (model) => model.id === preferredModelId,
+  )
+    ? preferredModelId
+    : (selectableModels[0]?.id ?? null);
 
   const document = conversation.document;
   const isReady = document.status === "READY";
@@ -184,7 +203,7 @@ export function ConversationView({
   function handleAsk(e: React.FormEvent) {
     e.preventDefault();
     const q = question.trim();
-    if (!q || isAsking || readOnly) return;
+    if (!q || isAsking || readOnly || !activeModelId) return;
 
     setQuestion("");
     setIsAsking(true);
@@ -196,6 +215,7 @@ export function ConversationView({
         role: "user",
         content: q,
         sources: null,
+        model: null,
         createdAt: new Date().toISOString(),
       },
       {
@@ -203,12 +223,13 @@ export function ConversationView({
         role: "assistant",
         content: "",
         sources: null,
+        model: activeModelId,
         createdAt: new Date().toISOString(),
         streaming: true,
       },
     ]);
 
-    ask(conversationId, q);
+    ask(conversationId, q, activeModelId);
   }
 
   const title =
@@ -306,7 +327,20 @@ export function ConversationView({
               </p>
             )}
             {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                modelLabel={
+                  msg.model
+                    ? (() => {
+                        const model = models.find((m) => m.id === msg.model);
+                        return model
+                          ? `${model.label} · ${model.hint}`
+                          : msg.model;
+                      })()
+                    : null
+                }
+              />
             ))}
             <div ref={messagesEndRef} />
           </div>
@@ -314,29 +348,39 @@ export function ConversationView({
           {!readOnly && isReady && (
             <form
               onSubmit={handleAsk}
-              className="sticky bottom-4 flex items-end gap-2"
+              className="sticky bottom-4 flex flex-col gap-2"
             >
-              <Textarea
-                placeholder="Ask a question about this document…"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                disabled={isAsking}
-                className="max-h-40 min-h-11 resize-none text-sm"
-                rows={1}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleAsk(e);
-                  }
-                }}
-              />
-              <Button
-                type="submit"
-                disabled={isAsking || !question.trim()}
-                className="shrink-0"
-              >
-                {isAsking ? "…" : "Ask"}
-              </Button>
+              <div className="flex items-end gap-2">
+                <Textarea
+                  placeholder="Ask a question about this document…"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  disabled={isAsking}
+                  className="max-h-40 min-h-11 resize-none text-sm"
+                  rows={1}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleAsk(e);
+                    }
+                  }}
+                />
+                <Button
+                  type="submit"
+                  disabled={isAsking || !question.trim() || !activeModelId}
+                  className="shrink-0"
+                >
+                  {isAsking ? "…" : "Ask"}
+                </Button>
+              </div>
+              {models.length > 0 && (
+                <ModelPicker
+                  models={models}
+                  value={activeModelId}
+                  onChange={setSelectedModelId}
+                  disabled={isAsking}
+                />
+              )}
             </form>
           )}
           {!readOnly && isReady && (
@@ -382,7 +426,13 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({
+  message,
+  modelLabel,
+}: {
+  message: Message;
+  modelLabel: string | null;
+}) {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const isUser = message.role === "user";
   const sources = message.sources as Source[] | null;
@@ -401,6 +451,10 @@ function MessageBubble({ message }: { message: Message }) {
         {message.content ||
           (message.streaming ? <span className="opacity-50">●●●</span> : null)}
       </div>
+
+      {!isUser && !message.streaming && modelLabel && (
+        <p className="text-muted-foreground pl-1 text-xs">{modelLabel}</p>
+      )}
 
       {!isUser && !message.streaming && sources && sources.length > 0 && (
         <div className="w-full max-w-[85%] space-y-1">

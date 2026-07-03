@@ -9,7 +9,7 @@ import {
 import { Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { QueueEvents } from "bullmq";
-import { streamAnswer } from "ai";
+import { streamAnswer, resolveModelId } from "ai";
 import { AuthService } from "../auth/auth.service";
 import type { AuthUser } from "../auth/auth.types";
 import { SearchService } from "../search/search.service";
@@ -29,6 +29,7 @@ type AskPayload = {
   documentId: string;
   conversationId: string;
   question: string;
+  modelId?: string;
 };
 
 type SocketData = {
@@ -197,12 +198,17 @@ export class ResearchGateway
     @MessageBody() payload: AskPayload,
     @ConnectedSocket() client: Socket,
   ): Promise<void> {
-    const { documentId, conversationId, question } = payload;
+    const { documentId, conversationId, question, modelId: requestedModelId } =
+      payload;
     const user = this.getSocketUser(client);
 
     try {
       await this.documentService.assertDocumentOwner(documentId, user.id);
       await this.usageService.assertWithinDailyQuestionLimit(user.id);
+
+      const plan = await this.usageService.getUserPlan(user.id);
+      const modelId = resolveModelId(requestedModelId, plan);
+
       await this.conversationService.addUserMessage(
         conversationId,
         question,
@@ -223,6 +229,7 @@ export class ResearchGateway
             conversationId,
             fallback,
             [],
+            modelId,
           );
         client.emit("answer:done", {
           sources: [],
@@ -233,7 +240,7 @@ export class ResearchGateway
       }
 
       let fullAnswer = "";
-      for await (const token of streamAnswer(question, chunks)) {
+      for await (const token of streamAnswer(question, chunks, modelId)) {
         fullAnswer += token;
         client.emit("answer:chunk", { content: token });
       }
@@ -250,6 +257,7 @@ export class ResearchGateway
           conversationId,
           fullAnswer,
           sources,
+          modelId,
         );
 
       client.emit("answer:done", {

@@ -61,6 +61,7 @@ model Message {
   role           String
   content        String
   sources        Json?
+  model          String?
 
   createdAt DateTime @default(now())
 

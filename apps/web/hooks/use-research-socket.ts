@@ -95,8 +95,13 @@ export function useResearchSocket(
   }, [documentId, enabled]);
 
   const ask = useCallback(
-    (conversationId: string, question: string) => {
-      socketRef.current?.emit("ask", { documentId, conversationId, question });
+    (conversationId: string, question: string, modelId?: string) => {
+      socketRef.current?.emit("ask", {
+        documentId,
+        conversationId,
+        question,
+        modelId,
+      });
     },
     [documentId],
   );
