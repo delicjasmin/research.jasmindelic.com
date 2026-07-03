@@ -35,11 +35,14 @@ model Document {
 }
 
 model Conversation {
-  id         String   @id @default(cuid())
-  documentId String
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  title      String?
-  shareToken String?  @unique
+  id                       String         @id @default(cuid())
+  documentId               String
+  document                 Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  title                    String?
+  shareToken               String?        @unique
+  forkedFromConversationId String?
+  forkedFromConversation   Conversation?  @relation("ConversationFork", fields: [forkedFromConversationId], references: [id], onDelete: SetNull)
+  forks                    Conversation[] @relation("ConversationFork")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -48,6 +51,7 @@ model Conversation {
 
   @@index([documentId])
   @@index([updatedAt])
+  @@index([forkedFromConversationId])
 }
 
 model Message {

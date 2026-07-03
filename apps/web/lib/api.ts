@@ -138,6 +138,19 @@ export async function fetchSharedConversation(
   return handleResponse(res);
 }
 
+export async function forkSharedConversation(
+  shareToken: string,
+): Promise<ConversationDetail> {
+  const res = await fetch(
+    `${API_BASE}/conversations/shared/${shareToken}/fork`,
+    {
+      method: "POST",
+      headers: await getAuthHeaders(),
+    },
+  );
+  return handleResponse(res);
+}
+
 export async function createConversation(
   documentId: string,
 ): Promise<{ id: string; documentId: string; title: string | null }> {

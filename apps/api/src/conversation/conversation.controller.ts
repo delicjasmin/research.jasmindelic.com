@@ -25,6 +25,12 @@ export class ConversationController {
     return this.conversationService.getSharedConversation(token);
   }
 
+  @Post("shared/:token/fork")
+  @UseGuards(AuthGuard)
+  forkShared(@Param("token") token: string, @CurrentUser() user: AuthUser) {
+    return this.conversationService.forkSharedConversation(token, user.id);
+  }
+
   @Get()
   @UseGuards(AuthGuard)
   list(

@@ -347,7 +347,7 @@ export function ConversationView({
 
       {readOnly && (
         <p className="text-muted-foreground text-center text-xs">
-          This is a shared read-only conversation.
+          This is a shared conversation preview.
         </p>
       )}
     </div>

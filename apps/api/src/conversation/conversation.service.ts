@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { randomBytes } from "node:crypto";
+import { cloneDocumentChunks } from "database";
 import { PrismaService } from "../prisma/prisma.service";
 
 export type MessageSource = {
@@ -137,21 +138,7 @@ export class ConversationService {
   async getSharedConversation(token: string): Promise<ConversationDetail> {
     const conversation = await this.prisma.db.conversation.findUnique({
       where: { shareToken: token },
-      include: {
-        document: {
-          select: {
-            id: true,
-            url: true,
-            title: true,
-            summary: true,
-            status: true,
-            errorMessage: true,
-          },
-        },
-        messages: {
-          orderBy: { createdAt: "asc" },
-        },
-      },
+      include: this.sharedConversationInclude(),
     });
 
     if (!conversation) {
@@ -159,6 +146,121 @@ export class ConversationService {
     }
 
     return this.toConversationDetail(conversation);
+  }
+
+  private sharedConversationInclude() {
+    return {
+      document: {
+        select: {
+          id: true,
+          url: true,
+          title: true,
+          summary: true,
+          status: true,
+          errorMessage: true,
+        },
+      },
+      messages: {
+        orderBy: { createdAt: "asc" as const },
+      },
+    };
+  }
+
+  async forkSharedConversation(
+    shareToken: string,
+    userId: string,
+  ): Promise<ConversationDetail> {
+    const source = await this.prisma.db.conversation.findUnique({
+      where: { shareToken },
+      include: {
+        document: true,
+        messages: { orderBy: { createdAt: "asc" } },
+      },
+    });
+
+    if (!source) {
+      throw new NotFoundException("Shared conversation not found");
+    }
+
+    if (source.document.userId === userId) {
+      return this.getConversation(source.id, userId);
+    }
+
+    const existingFork = await this.prisma.db.conversation.findFirst({
+      where: {
+        forkedFromConversationId: source.id,
+        document: { userId },
+      },
+      select: { id: true },
+    });
+
+    if (existingFork) {
+      return this.getConversation(existingFork.id, userId);
+    }
+
+    const documentId = await this.cloneDocumentForUser(source.document, userId);
+
+    const newConversation = await this.prisma.db.conversation.create({
+      data: {
+        documentId,
+        title: source.title,
+        forkedFromConversationId: source.id,
+        messages: {
+          create: source.messages.map((message) => ({
+            role: message.role,
+            content: message.content,
+            sources: message.sources ?? undefined,
+            createdAt: message.createdAt,
+          })),
+        },
+      },
+      select: { id: true },
+    });
+
+    return this.getConversation(newConversation.id, userId);
+  }
+
+  private async cloneDocumentForUser(
+    source: {
+      id: string;
+      url: string;
+      title: string | null;
+      summary: string | null;
+      status: string;
+      errorMessage: string | null;
+      pageCount: number | null;
+      fileSizeBytes: number | null;
+    },
+    userId: string,
+  ): Promise<string> {
+    const existing = await this.prisma.db.document.findFirst({
+      where: { userId, url: source.url, status: "READY" },
+      select: { id: true },
+    });
+
+    if (existing) {
+      return existing.id;
+    }
+
+    const newDocument = await this.prisma.db.document.create({
+      data: {
+        userId,
+        url: source.url,
+        title: source.title,
+        summary: source.summary,
+        status: source.status,
+        errorMessage: source.errorMessage,
+        pageCount: source.pageCount,
+        fileSizeBytes: source.fileSizeBytes,
+      },
+      select: { id: true },
+    });
+
+    if (source.status === "READY") {
+      await cloneDocumentChunks(this.prisma.db, source.id, newDocument.id);
+    }
+
+    return newDocument.id;
   }
 
   private toConversationDetail(conversation: {

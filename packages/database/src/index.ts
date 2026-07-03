@@ -8,6 +8,9 @@ export {
   isUnlimitedPlan,
 } from "./limits.js";
 export {
+  cloneDocumentChunks,
+} from "./document-clone.js";
+export {
   searchSimilarChunks,
   setChunkEmbedding,
   type SearchSimilarChunksOptions,

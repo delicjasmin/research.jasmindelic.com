@@ -15,7 +15,7 @@ import { submitDocument } from "@/lib/api";
 export function SubmitForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session } = authClient.useSession();
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
@@ -56,14 +56,14 @@ export function SubmitForm() {
                 placeholder="https://arxiv.org/pdf/…"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                disabled={loading || isPending}
+                disabled={loading}
                 className="font-mono text-sm"
               />
             </div>
             <Button
               type="submit"
               className="w-full"
-              disabled={loading || isPending || !url.trim()}
+              disabled={loading || !url.trim()}
             >
               {loading ? "Submitting…" : "Analyse PDF"}
             </Button>

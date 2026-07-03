@@ -1,7 +1,9 @@
+import { ConversationView } from "@/app/(main)/c/[conversationId]/conversation-view";
+import { SharedConversationContinue } from "@/components/shared-conversation-continue";
+import { fetchSharedConversation } from "@/lib/api";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { fetchSharedConversation } from "@/lib/api";
-import { ConversationView } from "@/app/(main)/c/[conversationId]/conversation-view";
 
 export default async function SharedConversationPage({
   params,
@@ -18,10 +20,16 @@ export default async function SharedConversationPage({
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-border flex items-center justify-between border-b px-4 py-3">
-        <Link href="/" className="text-sm font-semibold">
-          Research
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-sm font-semibold"
+        >
+          <Image src="/logo.png" alt="AI Research" width={24} height={24} />
+          AI Research
         </Link>
-        <span className="text-muted-foreground text-xs">Shared conversation</span>
+        <span className="text-muted-foreground text-xs">
+          Shared conversation
+        </span>
       </header>
       <main className="flex-1">
         <ConversationView
@@ -29,6 +37,7 @@ export default async function SharedConversationPage({
           initialConversation={conversation}
           readOnly
         />
+        <SharedConversationContinue shareToken={token} />
       </main>
     </div>
   );
