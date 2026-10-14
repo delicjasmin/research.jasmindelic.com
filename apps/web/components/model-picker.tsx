@@ -133,8 +133,8 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
                       {model.hint}
                     </span>
                     {model.disabledReason === "pro" && (
-                      <span className="bg-muted text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-medium tracking-wide uppercase">
-                        Pro
+                      <span className="bg-muted text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-medium">
+                        Coming soon…
                       </span>
                     )}
                     {isSelected && !isDisabled && (
@@ -164,7 +164,7 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
               </p>
               {hovered.disabledReason === "pro" && (
                 <p className="text-muted-foreground/80 mt-2 text-[0.625rem]">
-                  Upgrade to Pro to use this model.
+                  Coming soon…
                 </p>
               )}
             </div>

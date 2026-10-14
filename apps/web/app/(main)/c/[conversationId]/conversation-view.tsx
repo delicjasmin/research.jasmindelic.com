@@ -254,9 +254,14 @@ export function ConversationView({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <h1 className="truncate font-semibold">{title}</h1>
-          <p className="text-muted-foreground truncate font-mono text-xs">
+          <a
+            href={document.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground truncate font-mono text-xs underline"
+          >
             {document.url}
-          </p>
+          </a>
         </div>
         <div className="flex shrink-0 items-center gap-2 self-start">
           {!readOnly && (
@@ -351,6 +356,8 @@ export function ConversationView({
                   )}
                   <MessageBubble
                     message={msg}
+                    documentUrl={document.url}
+                    documentTitle={document.title}
                     modelLabel={
                       msg.model
                         ? (() => {
@@ -433,16 +440,18 @@ function StatusBadge({ status }: { status: string }) {
 function MessageBubble({
   message,
   modelLabel,
+  documentUrl,
+  documentTitle,
 }: {
   message: Message;
   modelLabel: string | null;
+  documentUrl: string;
+  documentTitle: string | null;
 }) {
-  const [sourcesOpen, setSourcesOpen] = useState(false);
   const isUser = message.role === "user";
   const sources = message.sources as Source[] | null;
-  const isEmptyStreaming = message.streaming && !message.content;
 
-  if (isEmptyStreaming) {
+  if (!isUser && !message.content.trim()) {
     return null;
   }
 
@@ -460,48 +469,20 @@ function MessageBubble({
         {isUser ? (
           message.content
         ) : (
-          <MarkdownContent content={message.content} className="text-sm" />
+          <MarkdownContent
+            content={message.content}
+            className="text-sm"
+            citations={
+              !message.streaming && sources && sources.length > 0
+                ? { sources, documentUrl, documentTitle }
+                : undefined
+            }
+          />
         )}
       </div>
 
       {!isUser && !message.streaming && modelLabel && (
         <p className="text-muted-foreground pl-1 text-xs">{modelLabel}</p>
-      )}
-
-      {!isUser && !message.streaming && sources && sources.length > 0 && (
-        <div className="w-full max-w-[85%] space-y-1">
-          <button
-            type="button"
-            onClick={() => setSourcesOpen((o) => !o)}
-            className="text-muted-foreground hover:text-foreground flex items-center gap-1 pl-1 text-xs"
-          >
-            <span>{sourcesOpen ? "▾" : "▸"}</span>
-            {sources.length} source
-            {sources.length !== 1 ? "s" : ""}
-          </button>
-
-          {sourcesOpen && (
-            <div className="space-y-2">
-              {sources.map((source, i) => (
-                <div
-                  key={source.id}
-                  className="border-border/60 bg-muted/40 space-y-1 rounded-lg border px-3 py-2 text-xs"
-                >
-                  <div className="text-muted-foreground flex items-center justify-between">
-                    <span className="font-medium">
-                      [{i + 1}] Page {source.pageNumber}
-                    </span>
-                    <span>{Math.round(source.similarity * 100)}% match</span>
-                  </div>
-                  <MarkdownContent
-                    content={source.content}
-                    className="text-foreground/90 line-clamp-4 text-xs leading-relaxed"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       )}
     </div>
   );

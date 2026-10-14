@@ -1,13 +1,56 @@
+"use client";
+
+import { useCallback, useMemo, type ReactNode } from "react";
 import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import {
+  CitationChip,
+  CitationClaim,
+  CitationProvider,
+  type CitationSource,
+} from "@/components/citation-claim";
+import { rehypeCiteClaims } from "@/lib/rehype-cite-claims";
 import { cn } from "@/lib/utils";
+
+export type MarkdownCitations = {
+  sources: CitationSource[];
+  documentUrl: string;
+  documentTitle: string | null;
+};
 
 type Props = {
   content: string;
   className?: string;
   inverted?: boolean;
+  citations?: MarkdownCitations;
 };
+
+function CitationSpan({
+  children,
+  node,
+  ...props
+}: {
+  children?: ReactNode;
+  node?: unknown;
+  "data-cite-claim"?: string | number;
+  "data-cite-chip"?: string | number;
+}) {
+  void node;
+  const claim = props["data-cite-claim"];
+  const chip = props["data-cite-chip"];
+  if (chip != null && chip !== "") {
+    return <CitationChip index={Number(chip)} />;
+  }
+  if (claim != null && claim !== "") {
+    const indexes = String(claim)
+      .split(",")
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value));
+    return <CitationClaim indexes={indexes}>{children}</CitationClaim>;
+  }
+  return <span {...props}>{children}</span>;
+}
 
 function createComponents(inverted: boolean): Components {
   return {
@@ -149,15 +192,55 @@ function createComponents(inverted: boolean): Components {
   };
 }
 
-export function MarkdownContent({ content, className, inverted = false }: Props) {
+export function MarkdownContent({
+  content,
+  className,
+  inverted = false,
+  citations,
+}: Props) {
+  const sourceCount = citations?.sources.length ?? 0;
+  const rehypePlugins = useMemo(
+    () => (sourceCount > 0 ? [rehypeCiteClaims(sourceCount)] : undefined),
+    [sourceCount],
+  );
+  const renderExcerpt = useCallback(
+    (excerpt: string) => (
+      <MarkdownContent
+        content={excerpt}
+        className="text-foreground/90 line-clamp-4 text-xs leading-relaxed"
+      />
+    ),
+    [],
+  );
+  const components = createComponents(inverted);
+  if (rehypePlugins) {
+    components.span = CitationSpan;
+  }
+
+  const markdown = (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={rehypePlugins}
+      components={components}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+
   return (
     <div className={cn("leading-relaxed", className)}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={createComponents(inverted)}
-      >
-        {content}
-      </ReactMarkdown>
+      {citations && rehypePlugins ? (
+        <CitationProvider
+          sources={citations.sources}
+          documentUrl={citations.documentUrl}
+          documentTitle={citations.documentTitle}
+          renderExcerpt={renderExcerpt}
+        >
+          {markdown}
+        </CitationProvider>
+      ) : (
+        markdown
+      )}
     </div>
   );
 }
