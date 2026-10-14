@@ -29,8 +29,8 @@ export function DocumentSummary({ summary, hasMessages }: Props) {
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="border-border text-foreground bg-accent hover:bg-muted/50 flex w-full items-center justify-between rounded-lg border-2 p-4 text-lg font-bold transition-[border-radius] duration-0 data-[state=closed]:delay-300 data-[state=open]:rounded-b-none">
-        <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+      <CollapsibleTrigger className="border-border text-foreground bg-accent hover:bg-muted/50 flex w-full items-center justify-between rounded-lg border-2 p-4 transition-[border-radius] duration-0 data-[state=closed]:delay-300 data-[state=open]:rounded-b-none">
+        <span className="text-muted-foreground text-[0.8125rem] font-medium">
           Summary
         </span>
         <HugeiconsIcon
@@ -44,7 +44,7 @@ export function DocumentSummary({ summary, hasMessages }: Props) {
       </CollapsibleTrigger>
       <CollapsibleContent className="CollapsibleContent">
         <div className="border-border max-h-96 overflow-y-auto rounded-xl rounded-t-none border border-t-0 p-4">
-          <MarkdownContent content={summary} className="text-sm" />
+          <MarkdownContent content={summary} />
         </div>
       </CollapsibleContent>
     </Collapsible>

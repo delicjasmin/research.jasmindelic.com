@@ -66,7 +66,7 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
         aria-expanded={open}
         aria-haspopup="listbox"
         onClick={() => setOpen((current) => !current)}
-        className="text-muted-foreground hover:text-foreground h-7 min-w-24 justify-between gap-2 rounded-full px-2 font-normal md:text-sm"
+        className="text-muted-foreground hover:text-foreground h-8 min-w-24 justify-between gap-2 rounded-full px-2.5 font-normal"
       >
         <span className="truncate">
           {selected ? (
@@ -78,11 +78,11 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
         <span
           aria-hidden
           className={cn(
-            "text-muted-foreground shrink-0 text-[0.625rem] transition-transform",
+            "text-muted-foreground shrink-0 transition-transform",
             open && "rotate-180",
           )}
         >
-          <HugeiconsIcon icon={ChevronDown} strokeWidth={2} />
+          <HugeiconsIcon icon={ChevronDown} strokeWidth={2} className="size-4" />
         </span>
       </Button>
 
@@ -114,7 +114,7 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
                       setOpen(false);
                     }}
                     className={cn(
-                      "flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors",
+                      "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors",
                       isDisabled
                         ? "text-muted-foreground/50 cursor-not-allowed"
                         : "hover:bg-muted/60 cursor-pointer",
@@ -129,18 +129,18 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
                     >
                       {model.label}
                     </span>
-                    <span className="text-muted-foreground shrink-0">
+                    <span className="text-muted-foreground shrink-0 text-[0.8125rem]">
                       {model.hint}
                     </span>
                     {model.disabledReason === "pro" && (
-                      <span className="bg-muted text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] font-medium">
+                      <span className="bg-muted text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-[0.8125rem] font-medium">
                         Coming soon…
                       </span>
                     )}
                     {isSelected && !isDisabled && (
                       <span
                         aria-hidden
-                        className="text-foreground shrink-0 text-xs"
+                        className="text-foreground shrink-0 text-sm"
                       >
                         ✓
                       </span>
@@ -153,17 +153,17 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
 
           {hovered && (
             <div className="border-border bg-popover text-popover-foreground hidden w-52 shrink-0 rounded-lg border p-3 shadow-lg sm:block">
-              <p className="text-foreground text-xs font-medium">
+              <p className="text-foreground text-sm font-medium">
                 {hovered.label}{" "}
                 <span className="text-muted-foreground font-normal">
                   ({hovered.hint})
                 </span>
               </p>
-              <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
+              <p className="text-muted-foreground mt-1.5 text-[0.8125rem] leading-relaxed">
                 {hovered.description}
               </p>
               {hovered.disabledReason === "pro" && (
-                <p className="text-muted-foreground/80 mt-2 text-[0.625rem]">
+                <p className="text-muted-foreground mt-2 text-[0.8125rem]">
                   Coming soon…
                 </p>
               )}

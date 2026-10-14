@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -53,12 +53,14 @@ function CitationSpan({
 }
 
 function createComponents(inverted: boolean): Components {
+  const ink = inverted && "text-user-foreground";
+
   return {
     h1: ({ children }) => (
       <h1
         className={cn(
-          "mt-4 mb-2 text-lg font-semibold first:mt-0",
-          inverted && "text-primary-foreground",
+          "mt-[1.2em] mb-[0.45em] text-[1.625rem] leading-snug font-semibold first:mt-0",
+          ink,
         )}
       >
         {children}
@@ -67,8 +69,8 @@ function createComponents(inverted: boolean): Components {
     h2: ({ children }) => (
       <h2
         className={cn(
-          "mt-4 mb-2 text-base font-semibold first:mt-0",
-          inverted && "text-primary-foreground",
+          "mt-[1.15em] mb-[0.4em] text-[1.375rem] leading-snug font-semibold first:mt-0",
+          ink,
         )}
       >
         {children}
@@ -77,8 +79,8 @@ function createComponents(inverted: boolean): Components {
     h3: ({ children }) => (
       <h3
         className={cn(
-          "mt-3 mb-1.5 text-sm font-semibold first:mt-0",
-          inverted && "text-primary-foreground",
+          "mt-[1.05em] mb-[0.35em] text-[1.125rem] leading-snug font-semibold first:mt-0",
+          ink,
         )}
       >
         {children}
@@ -87,44 +89,39 @@ function createComponents(inverted: boolean): Components {
     h4: ({ children }) => (
       <h4
         className={cn(
-          "mt-3 mb-1 text-sm font-medium first:mt-0",
-          inverted && "text-primary-foreground",
+          "mt-[1em] mb-[0.3em] text-[1.125rem] leading-snug font-medium first:mt-0",
+          ink,
         )}
       >
         {children}
       </h4>
     ),
     p: ({ children }) => (
-      <p
-        className={cn(
-          "mb-2 last:mb-0",
-          inverted && "text-primary-foreground",
-        )}
-      >
-        {children}
-      </p>
+      <p className={cn("mb-[0.8em] last:mb-0", ink)}>{children}</p>
     ),
     strong: ({ children }) => (
       <strong className="font-semibold">{children}</strong>
     ),
     em: ({ children }) => <em className="italic">{children}</em>,
     ul: ({ children }) => (
-      <ul className="mb-2 list-disc space-y-1 pl-5 last:mb-0">{children}</ul>
+      <ul className="mb-[0.8em] list-disc space-y-2 pl-6 last:mb-0">
+        {children}
+      </ul>
     ),
     ol: ({ children }) => (
-      <ol className="mb-2 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>
+      <ol className="mb-[0.8em] list-decimal space-y-2 pl-6 last:mb-0">
+        {children}
+      </ol>
     ),
-    li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+    li: ({ children }) => <li>{children}</li>,
     a: ({ href, children }) => (
       <a
         href={href}
         target="_blank"
         rel="noopener noreferrer"
         className={cn(
-          "underline underline-offset-2",
-          inverted
-            ? "text-primary-foreground"
-            : "text-foreground hover:text-foreground/80",
+          "underline underline-offset-4",
+          inverted ? "text-user-foreground" : "text-foreground",
         )}
       >
         {children}
@@ -133,8 +130,10 @@ function createComponents(inverted: boolean): Components {
     blockquote: ({ children }) => (
       <blockquote
         className={cn(
-          "border-border text-muted-foreground my-2 border-l-2 pl-3 italic",
-          inverted && "border-primary-foreground/40 text-primary-foreground/80",
+          "my-[0.8em] border-l-2 pl-4 italic last:mb-0",
+          inverted
+            ? "border-user-foreground/40 text-user-foreground/90"
+            : "border-foreground/25 text-foreground/90",
         )}
       >
         {children}
@@ -147,8 +146,8 @@ function createComponents(inverted: boolean): Components {
         return (
           <code
             className={cn(
-              "font-mono text-xs",
-              inverted ? "text-primary-foreground" : "text-foreground",
+              "font-mono text-[0.9em]",
+              inverted ? "text-user-foreground" : "text-foreground",
             )}
           >
             {children}
@@ -159,10 +158,10 @@ function createComponents(inverted: boolean): Components {
       return (
         <code
           className={cn(
-            "rounded px-1 py-0.5 font-mono text-[0.8125rem]",
+            "rounded px-1.5 py-0.5 font-mono text-[0.9em]",
             inverted
-              ? "bg-primary-foreground/15 text-primary-foreground"
-              : "bg-background/60 text-foreground",
+              ? "bg-user-foreground/15 text-user-foreground"
+              : "bg-foreground/6 text-foreground",
           )}
         >
           {children}
@@ -172,10 +171,10 @@ function createComponents(inverted: boolean): Components {
     pre: ({ children }) => (
       <pre
         className={cn(
-          "my-2 overflow-x-auto rounded-lg p-3 font-mono text-xs last:mb-0",
+          "my-[0.8em] overflow-x-auto rounded-lg p-4 font-mono text-[0.9em] last:mb-0",
           inverted
-            ? "bg-primary-foreground/10 text-primary-foreground"
-            : "bg-background/60 text-foreground",
+            ? "bg-user-foreground/10 text-user-foreground"
+            : "bg-foreground/5 text-foreground",
         )}
       >
         {children}
@@ -184,8 +183,8 @@ function createComponents(inverted: boolean): Components {
     hr: () => (
       <hr
         className={cn(
-          "my-3 border-t",
-          inverted ? "border-primary-foreground/20" : "border-border",
+          "my-[1.2em] border-t",
+          inverted ? "border-user-foreground/20" : "border-border",
         )}
       />
     ),
@@ -203,15 +202,6 @@ export function MarkdownContent({
     () => (sourceCount > 0 ? [rehypeCiteClaims(sourceCount)] : undefined),
     [sourceCount],
   );
-  const renderExcerpt = useCallback(
-    (excerpt: string) => (
-      <MarkdownContent
-        content={excerpt}
-        className="text-foreground/90 line-clamp-4 text-xs leading-relaxed"
-      />
-    ),
-    [],
-  );
   const components = createComponents(inverted);
   if (rehypePlugins) {
     components.span = CitationSpan;
@@ -228,13 +218,12 @@ export function MarkdownContent({
   );
 
   return (
-    <div className={cn("leading-relaxed", className)}>
+    <div className={cn("reading", className)}>
       {citations && rehypePlugins ? (
         <CitationProvider
           sources={citations.sources}
           documentUrl={citations.documentUrl}
           documentTitle={citations.documentTitle}
-          renderExcerpt={renderExcerpt}
         >
           {markdown}
         </CitationProvider>

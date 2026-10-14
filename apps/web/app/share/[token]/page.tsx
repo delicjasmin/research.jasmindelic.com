@@ -27,7 +27,7 @@ export default async function SharedConversationPage({
           <Image src="/logo.png" alt="AI Research" width={24} height={24} />
           AI Research
         </Link>
-        <span className="text-muted-foreground text-xs">
+        <span className="text-muted-foreground text-[0.8125rem]">
           Shared conversation
         </span>
       </header>

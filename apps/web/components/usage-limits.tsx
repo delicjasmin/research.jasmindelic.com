@@ -31,7 +31,7 @@ export function UsageLimits({ className, showQuestions = true }: Props) {
 
   if (usage.plan !== "free") {
     return (
-      <p className={cn("text-muted-foreground text-xs", className)}>
+      <p className={cn("text-muted-foreground text-[0.8125rem]", className)}>
         {usage.plan} plan · unlimited usage
       </p>
     );
@@ -48,7 +48,7 @@ export function UsageLimits({ className, showQuestions = true }: Props) {
   return (
     <p
       className={cn(
-        "text-xs",
+        "text-[0.8125rem]",
         atDocumentLimit || atQuestionLimit
           ? "text-destructive"
           : "text-muted-foreground",

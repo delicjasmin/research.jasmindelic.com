@@ -48,7 +48,7 @@ export function ChatComposer({
             value={question}
             onChange={(e) => onQuestionChange(e.target.value)}
             disabled={isAsking}
-            className="max-h-40 min-h-11 resize-none border-0 bg-transparent px-4 pt-4 pb-2 text-sm shadow-none focus-visible:ring-0 sm:min-h-10 sm:flex-1 sm:px-3 sm:py-2.5"
+            className="max-h-40 min-h-11 resize-none border-0 bg-transparent px-4 pt-4 pb-2 text-base shadow-none focus-visible:ring-0 sm:min-h-10 sm:flex-1 sm:px-3 sm:py-2.5"
             rows={1}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {

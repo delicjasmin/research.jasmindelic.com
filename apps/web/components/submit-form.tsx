@@ -57,7 +57,7 @@ export function SubmitForm() {
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 disabled={loading}
-                className="font-mono text-sm"
+                className="font-mono text-base"
               />
             </div>
             <Button

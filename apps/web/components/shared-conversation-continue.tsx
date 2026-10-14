@@ -40,7 +40,7 @@ export function SharedConversationContinue({ shareToken }: Props) {
 
   return (
     <>
-      <div className="mx-auto flex max-w-3xl flex-col items-center gap-3 px-4 pb-8">
+      <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-3 px-4 pb-8">
         <Button onClick={handleContinue} disabled={forking}>
           {forking
             ? "Starting…"
@@ -48,7 +48,7 @@ export function SharedConversationContinue({ shareToken }: Props) {
               ? "Continue this conversation"
               : "Sign in to continue"}
         </Button>
-        <p className="text-muted-foreground text-center text-xs">
+        <p className="text-muted-foreground text-center text-[0.8125rem]">
           {session
             ? "Your questions are saved to your own copy. The original shared conversation stays unchanged."
             : "Anyone can view this conversation. Sign in only if you want to ask your own questions."}

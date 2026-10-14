@@ -19,7 +19,7 @@ export function SignInButton() {
   if (session) {
     return (
       <div className="space-y-2">
-        <p className="text-muted-foreground flex items-center gap-2 truncate px-1 text-xs">
+        <p className="text-muted-foreground flex items-center gap-2 truncate px-1 text-[0.8125rem]">
           <HugeiconsIcon
             icon={UserCircleIcon}
             strokeWidth={2}

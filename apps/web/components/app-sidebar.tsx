@@ -61,7 +61,7 @@ export function SidebarContent({ onNavigate, className }: SidebarContentProps) {
         <Link
           href="/"
           onClick={onNavigate}
-          className="flex items-center gap-2 text-lg font-semibold tracking-tight"
+          className="flex items-center gap-2 text-lg font-semibold"
         >
           <Image src="/logo.png" alt="Research" width={32} height={32} />
           AI Research
@@ -79,22 +79,22 @@ export function SidebarContent({ onNavigate, className }: SidebarContentProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-2">
-        <p className="text-muted-foreground px-2 py-2 text-xs font-medium tracking-wide uppercase">
+        <p className="text-muted-foreground px-2 py-2 text-[0.8125rem] font-medium">
           Conversations
         </p>
 
         {!session && (
-          <p className="text-muted-foreground px-2 py-4 text-sm">
+          <p className="text-muted-foreground px-2 py-4 text-[0.8125rem]">
             Sign in to see your conversations.
           </p>
         )}
 
         {session && isLoading && (
-          <p className="text-muted-foreground px-2 py-4 text-sm">Loading…</p>
+          <p className="text-muted-foreground px-2 py-4 text-[0.8125rem]">Loading…</p>
         )}
 
         {session && !isLoading && conversations.length === 0 && (
-          <p className="text-muted-foreground px-2 py-4 text-sm">
+          <p className="text-muted-foreground px-2 py-4 text-[0.8125rem]">
             No conversations yet. Start by analysing a PDF.
           </p>
         )}
@@ -109,26 +109,34 @@ export function SidebarContent({ onNavigate, className }: SidebarContentProps) {
               <li key={conversation.id}>
                 <div
                   className={cn(
-                    "group flex items-center gap-1 rounded-lg px-2 py-1.5",
+                    "group flex items-center gap-1 rounded-lg px-2.5 py-2",
                     isActive
-                      ? "bg-background shadow-sm"
-                      : "hover:bg-background/70",
+                      ? "bg-foreground/10 shadow-sm ring-1 ring-foreground/20"
+                      : "hover:bg-foreground/5",
                   )}
                 >
                   <Link
                     href={href}
                     onClick={onNavigate}
+                    aria-current={isActive ? "page" : undefined}
                     className="min-w-0 flex-1"
                   >
-                    <p className="truncate text-sm font-medium">{label}</p>
-                    <p className="text-muted-foreground truncate text-xs">
+                    <p
+                      className={cn(
+                        "truncate text-sm",
+                        isActive ? "font-semibold" : "font-medium",
+                      )}
+                    >
+                      {label}
+                    </p>
+                    <p className="text-muted-foreground truncate text-[0.8125rem]">
                       {formatRelativeTime(conversation.updatedAt)}
                     </p>
                   </Link>
                   <button
                     type="button"
                     onClick={() => deleteMutation.mutate(conversation.id)}
-                    className="text-muted-foreground hover:text-destructive shrink-0 rounded p-1 text-xs opacity-0 transition group-hover:opacity-100"
+                    className="text-muted-foreground hover:text-destructive shrink-0 rounded p-1 text-[0.8125rem] opacity-0 transition group-hover:opacity-100"
                     aria-label="Delete conversation"
                   >
                     ✕

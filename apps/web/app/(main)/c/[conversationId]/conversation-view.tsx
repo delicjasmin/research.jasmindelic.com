@@ -28,6 +28,7 @@ import {
   enableConversationShare,
   fetchModels,
 } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type Message = ConversationMessage & {
   streaming?: boolean;
@@ -250,15 +251,15 @@ export function ConversationView({
   const title = document.title ?? "Analysing document…";
 
   return (
-    <div className="mx-auto flex min-h-full max-w-3xl flex-col gap-6 px-3 py-4 md:px-4 md:py-8 lg:w-3xl">
+    <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col gap-6 px-3 py-4 md:px-4 md:py-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
-          <h1 className="truncate font-semibold">{title}</h1>
+          <h1 className="truncate text-xl font-semibold">{title}</h1>
           <a
             href={document.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-muted-foreground truncate font-mono text-xs underline"
+            className="text-muted-foreground truncate font-mono text-[0.8125rem] underline underline-offset-4"
           >
             {document.url}
           </a>
@@ -320,7 +321,7 @@ export function ConversationView({
               <MarkerContent className="shimmer">
                 {getProcessingLabel(progress)}
               </MarkerContent>
-              <span className="ml-auto font-mono text-xs tabular-nums">
+              <span className="ml-auto font-mono text-[0.8125rem] tabular-nums">
                 {progress}%
               </span>
             </Marker>
@@ -337,10 +338,10 @@ export function ConversationView({
       )}
 
       {(isReady || readOnly) && (
-        <div className="flex flex-1 flex-col gap-4">
-          <div className="flex flex-1 flex-col gap-4">
+        <div className="flex flex-1 flex-col gap-8">
+          <div className="flex flex-1 flex-col gap-8">
             {messages.length === 0 && !readOnly && (
-              <p className="text-muted-foreground py-2 text-center text-sm">
+              <p className="text-muted-foreground py-2 text-center text-[0.8125rem]">
                 Ask a question about this document.
               </p>
             )}
@@ -392,7 +393,7 @@ export function ConversationView({
       )}
 
       {readOnly && (
-        <p className="text-muted-foreground text-center text-xs">
+        <p className="text-muted-foreground text-center text-[0.8125rem]">
           This is a shared conversation preview.
         </p>
       )}
@@ -430,7 +431,7 @@ function StatusBadge({ status }: { status: string }) {
   const { label, className } = map[status] ?? map.PENDING;
   return (
     <span
-      className={`shrink-0 rounded-full px-2 py-1 text-xs font-medium ${className}`}
+      className={`shrink-0 rounded-full px-2 py-1 text-[0.8125rem] font-medium ${className}`}
     >
       {label}
     </span>
@@ -460,18 +461,19 @@ function MessageBubble({
       className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}
     >
       <div
-        className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+        className={cn(
+          "rounded-2xl",
           isUser
-            ? "bg-primary text-primary-foreground rounded-br-sm"
-            : `bg-muted text-foreground rounded-bl-sm${message.streaming ? "ring-border/60 ring-1" : ""}`
-        }`}
+            ? "bg-user text-user-foreground ml-auto max-w-[min(100%,32rem)] px-4 py-3 font-sans text-base"
+            : "bg-assistant text-assistant-foreground mr-auto w-full max-w-[calc(72ch+3rem)] p-5",
+          !isUser && message.streaming && "ring-border/60 ring-1",
+        )}
       >
         {isUser ? (
           message.content
         ) : (
           <MarkdownContent
             content={message.content}
-            className="text-sm"
             citations={
               !message.streaming && sources && sources.length > 0
                 ? { sources, documentUrl, documentTitle }
@@ -482,7 +484,9 @@ function MessageBubble({
       </div>
 
       {!isUser && !message.streaming && modelLabel && (
-        <p className="text-muted-foreground pl-1 text-xs">{modelLabel}</p>
+        <p className="text-muted-foreground pl-1 text-[0.8125rem]">
+          {modelLabel}
+        </p>
       )}
     </div>
   );
