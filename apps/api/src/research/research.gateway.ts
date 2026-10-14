@@ -23,6 +23,7 @@ import {
   type MessageSource,
 } from "../conversation/conversation.service";
 import { UsageService } from "../usage/usage.service";
+import { getRedisConnection } from "../redis-connection";
 
 type SubscribePayload = { documentId: string };
 type AskPayload = {
@@ -91,10 +92,7 @@ export class ResearchGateway
 
   onModuleInit() {
     this.queueEvents = new QueueEvents(PDF_QUEUE, {
-      connection: {
-        host: process.env.REDIS_HOST ?? "localhost",
-        port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
-      },
+      connection: getRedisConnection(),
     });
 
     this.queueEvents.on("progress", ({ jobId, data }) => {
@@ -198,8 +196,12 @@ export class ResearchGateway
     @MessageBody() payload: AskPayload,
     @ConnectedSocket() client: Socket,
   ): Promise<void> {
-    const { documentId, conversationId, question, modelId: requestedModelId } =
-      payload;
+    const {
+      documentId,
+      conversationId,
+      question,
+      modelId: requestedModelId,
+    } = payload;
     const user = this.getSocketUser(client);
 
     try {

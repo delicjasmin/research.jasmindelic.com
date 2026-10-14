@@ -10,14 +10,12 @@ import { ConversationModule } from "./conversation/conversation.module";
 import { ResearchModule } from "./research/research.module";
 import { UsageModule } from "./usage/usage.module";
 import { ModelsModule } from "./models/models.module";
+import { getRedisConnection } from "./redis-connection";
 
 @Module({
   imports: [
     BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST ?? "localhost",
-        port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
-      },
+      connection: getRedisConnection(),
     }),
     AuthModule,
     PrismaModule,

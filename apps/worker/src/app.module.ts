@@ -1,14 +1,12 @@
 import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bullmq";
 import { PdfModule } from "./pdf/pdf.module.js";
+import { getRedisConnection } from "./redis-connection.js";
 
 @Module({
   imports: [
     BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST ?? "localhost",
-        port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
-      },
+      connection: getRedisConnection(),
     }),
     PdfModule,
   ],

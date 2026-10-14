@@ -247,7 +247,7 @@ export function ConversationView({
     ask(conversationId, q, activeModelId);
   }
 
-  const title = conversation.title ?? document.title ?? "Analysing document…";
+  const title = document.title ?? "Analysing document…";
 
   return (
     <div className="mx-auto flex min-h-full max-w-3xl flex-col gap-6 px-3 py-4 md:px-4 md:py-8 lg:w-3xl">
