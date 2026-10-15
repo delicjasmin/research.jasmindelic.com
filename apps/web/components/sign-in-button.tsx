@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -7,12 +8,19 @@ import { UserCircleIcon } from "@hugeicons/core-free-icons";
 
 export function SignInButton() {
   const { data: session, isPending } = authClient.useSession();
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
-  if (isPending) {
+  if (!mounted || isPending) {
     return (
-      <Button variant="outline" size="sm" className="w-full" disabled>
-        Loading…
-      </Button>
+      <div
+        className="bg-muted h-7 w-full animate-pulse rounded-md"
+        role="status"
+        aria-label="Checking session"
+      />
     );
   }
 

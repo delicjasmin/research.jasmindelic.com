@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -35,7 +36,13 @@ export function SidebarContent({ onNavigate, className }: SidebarContentProps) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: session } = authClient.useSession();
+  const { data: session, isPending } = authClient.useSession();
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const sessionPending = !mounted || isPending;
 
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ["conversations"],
@@ -83,14 +90,16 @@ export function SidebarContent({ onNavigate, className }: SidebarContentProps) {
           Conversations
         </p>
 
-        {!session && (
+        {(sessionPending || (session && isLoading)) && (
           <p className="text-muted-foreground px-2 py-4 text-[0.8125rem]">
-            Sign in to see your conversations.
+            Loading…
           </p>
         )}
 
-        {session && isLoading && (
-          <p className="text-muted-foreground px-2 py-4 text-[0.8125rem]">Loading…</p>
+        {!sessionPending && !session && (
+          <p className="text-muted-foreground px-2 py-4 text-[0.8125rem]">
+            Sign in to see your conversations.
+          </p>
         )}
 
         {session && !isLoading && conversations.length === 0 && (
