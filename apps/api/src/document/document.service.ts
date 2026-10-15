@@ -83,6 +83,16 @@ export class DocumentService {
     return typeof job.progress === "number" ? job.progress : 0;
   }
 
+  async getTerminalFailureMessage(documentId: string): Promise<string | null> {
+    const job = await this.pdfQueue.getJob(documentId);
+    if (!job) return null;
+
+    const state = await job.getState();
+    if (state !== "failed") return null;
+
+    return job.failedReason || "Processing failed";
+  }
+
   async getDocument(id: string): Promise<DocumentSummary> {
     const document = await this.prisma.db.document.findUnique({
       where: { id },

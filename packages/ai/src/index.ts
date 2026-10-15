@@ -1,4 +1,4 @@
-export { createEmbedding, EMBEDDING_MODEL } from "./embeddings.js";
+export { createEmbedding, createEmbeddings, EMBEDDING_MODEL } from "./embeddings.js";
 export { summarize } from "./summarize.js";
 export { streamAnswer, DEFAULT_MODEL_ID } from "./stream-answer.js";
 export {

@@ -106,12 +106,24 @@ export class ResearchGateway
       void this.handleJobCompleted(jobId);
     });
 
-    this.queueEvents.on("failed", ({ jobId, failedReason }) => {
+    this.queueEvents.on("failed", ({ jobId }) => {
+      void this.emitTerminalDocumentError(jobId);
+    });
+  }
+
+  private async emitTerminalDocumentError(jobId: string): Promise<void> {
+    try {
+      const message =
+        await this.documentService.getTerminalFailureMessage(jobId);
+      if (!message) return;
+
       this.server.to(jobId).emit("document:error", {
         documentId: jobId,
-        message: failedReason ?? "Processing failed",
+        message,
       });
-    });
+    } catch (err) {
+      this.logger.error(`Failed to publish document error for ${jobId}`, err);
+    }
   }
 
   private async handleJobCompleted(jobId: string): Promise<void> {

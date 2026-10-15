@@ -41,9 +41,10 @@ type Props = {
 };
 
 function getProcessingLabel(progress: number) {
-  if (progress < 25) return "Downloading PDF…";
-  if (progress < 50) return "Parsing and chunking…";
-  if (progress < 82) return "Generating embeddings…";
+  if (progress < 8) return "Downloading PDF…";
+  if (progress < 15) return "Reading PDF…";
+  if (progress < 30) return "Saving passages…";
+  if (progress < 90) return "Generating embeddings…";
   return "Summarising…";
 }
 
@@ -53,7 +54,7 @@ export function ConversationView({
   readOnly = false,
 }: Props) {
   const queryClient = useQueryClient();
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState<number | null>(null);
   const [conversation, setConversation] = useState(initialConversation);
   const [messages, setMessages] = useState<Message[]>(
     initialConversation.messages,
@@ -96,7 +97,7 @@ export function ConversationView({
     document.id,
     {
       onProgress: useCallback(({ progress: p }: DocumentProgressEvent) => {
-        setProgress(p);
+        setProgress((current) => (current == null ? p : Math.max(current, p)));
         setConversation((prev) => ({
           ...prev,
           document: { ...prev.document, status: "PROCESSING" },
@@ -319,13 +320,17 @@ export function ConversationView({
                 <Spinner className="size-3.5" />
               </MarkerIcon>
               <MarkerContent className="shimmer">
-                {getProcessingLabel(progress)}
+                {progress == null
+                  ? "Preparing document…"
+                  : getProcessingLabel(progress)}
               </MarkerContent>
-              <span className="ml-auto font-mono text-[0.8125rem] tabular-nums">
-                {progress}%
-              </span>
+              {progress != null && (
+                <span className="ml-auto font-mono text-[0.8125rem] tabular-nums">
+                  {progress}%
+                </span>
+              )}
             </Marker>
-            <Progress value={progress} />
+            {progress != null && <Progress value={progress} />}
           </CardContent>
         </Card>
       )}

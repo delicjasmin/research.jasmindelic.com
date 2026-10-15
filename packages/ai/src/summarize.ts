@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-const MAX_INPUT_CHARS = 120_000;
+const MAX_INPUT_CHARS = 24_000;
 
 export async function summarize(text: string): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;

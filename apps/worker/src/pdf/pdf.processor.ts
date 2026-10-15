@@ -1,14 +1,21 @@
 import "dotenv/config";
+import { randomUUID } from "node:crypto";
 import { Processor, WorkerHost } from "@nestjs/bullmq";
 import { Logger } from "@nestjs/common";
 import { Job, UnrecoverableError } from "bullmq";
 import { PDFParse } from "pdf-parse";
-import { createEmbedding, summarize } from "ai";
+import { createEmbeddings, summarize } from "ai";
 import {
+  MAX_CHUNKS,
   MAX_PDF_PAGES,
   MAX_PDF_SIZE_BYTES,
-  prisma,
-  setChunkEmbedding,
+  countDocumentChunks,
+  getDirectPrisma,
+  insertDocumentChunkBatch,
+  listDocumentChunkTexts,
+  listPendingChunkEmbeddings,
+  setChunkEmbeddings,
+  type PrismaClient,
 } from "database";
 import {
   PDF_JOB_NAME,
@@ -19,6 +26,16 @@ import {
 
 const CHUNK_SIZE = 1500;
 const CHUNK_OVERLAP = 200;
+const INSERT_BATCH = 50;
+const EMBED_BATCH = 64;
+const SUMMARY_SAMPLE_CHARS = 24_000;
+
+type PageText = { text: string; pageNumber: number };
+type TextChunk = { content: string; pageNumber: number };
+
+function sanitizeText(text: string): string {
+  return text.replaceAll("\u0000", "");
+}
 
 function splitIntoChunks(text: string): string[] {
   const chunks: string[] = [];
@@ -31,8 +48,83 @@ function splitIntoChunks(text: string): string[] {
   return chunks;
 }
 
-async function failDocument(documentId: string, message: string): Promise<void> {
-  await prisma.document.update({
+function chunkPages(pageTexts: PageText[]): TextChunk[] {
+  const chunks: TextChunk[] = [];
+  for (const { text, pageNumber } of pageTexts) {
+    if (!text.trim()) continue;
+    if (text.length <= CHUNK_SIZE) {
+      chunks.push({ content: text.trim(), pageNumber });
+    } else {
+      for (const content of splitIntoChunks(text)) {
+        chunks.push({ content, pageNumber });
+      }
+    }
+  }
+  return chunks;
+}
+
+function embeddingProgress(embedded: number, total: number): number {
+  if (total <= 0) return 30;
+  return Math.min(90, 30 + Math.floor((embedded / total) * 60));
+}
+
+function sampleChunkText(
+  chunks: Array<{ content: string; pageNumber: number }>,
+): string {
+  if (chunks.length === 0) return "";
+
+  const targetCount = Math.min(chunks.length, 24);
+  const indexes: number[] = [];
+  for (let i = 0; i < targetCount; i++) {
+    const index =
+      targetCount === 1
+        ? 0
+        : Math.round((i * (chunks.length - 1)) / (targetCount - 1));
+    indexes.push(index);
+  }
+
+  let sample = "";
+  for (const index of [...new Set(indexes)].sort((a, b) => a - b)) {
+    const chunk = chunks[index];
+    if (!chunk) continue;
+    const piece = chunk.content.trim();
+    if (!piece) continue;
+    const block = `[Page ${chunk.pageNumber}]\n${piece}`;
+    const next = sample ? `${sample}\n\n${block}` : block;
+    if (next.length > SUMMARY_SAMPLE_CHARS) {
+      if (!sample) return block.slice(0, SUMMARY_SAMPLE_CHARS);
+      break;
+    }
+    sample = next;
+  }
+  return sample;
+}
+
+function titleFromChunks(
+  chunks: Array<{ content: string }>,
+  fallback: string,
+): string {
+  for (const chunk of chunks) {
+    const line = chunk.content
+      .split("\n")
+      .map((part) => part.trim())
+      .find((part) => part.length > 10);
+    if (line) return line.slice(0, 120);
+  }
+  return fallback;
+}
+
+function isTerminalAttempt(job: Job, err: unknown): boolean {
+  if (err instanceof UnrecoverableError) return true;
+  return job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
+}
+
+async function failDocument(
+  db: PrismaClient,
+  documentId: string,
+  message: string,
+): Promise<void> {
+  await db.document.update({
     where: { id: documentId },
     data: { status: "FAILED", errorMessage: message },
   });
@@ -42,114 +134,178 @@ async function failDocument(documentId: string, message: string): Promise<void> 
 export class PdfProcessor extends WorkerHost {
   private readonly logger = new Logger(PdfProcessor.name);
 
-  async process(job: Job<PdfJobData, PdfJobResult, typeof PDF_JOB_NAME>): Promise<PdfJobResult> {
+  async process(
+    job: Job<PdfJobData, PdfJobResult, typeof PDF_JOB_NAME>,
+  ): Promise<PdfJobResult> {
     const { documentId, url } = job.data;
+    const db = await getDirectPrisma();
     this.logger.log(`Processing PDF for document ${documentId}`);
 
     try {
-      await prisma.document.update({
+      await db.document.update({
         where: { id: documentId },
         data: { status: "PROCESSING" },
       });
-      await job.updateProgress(10);
 
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new UnrecoverableError(`Failed to fetch PDF: ${response.statusText}`);
+      if (!job.data.chunksReady) {
+        await this.prepareChunks(job, db);
       }
 
-      const buffer = Buffer.from(await response.arrayBuffer());
-      if (buffer.length > MAX_PDF_SIZE_BYTES) {
-        const maxMb = Math.round(MAX_PDF_SIZE_BYTES / (1024 * 1024));
-        throw new UnrecoverableError(`PDF exceeds the ${maxMb} MB size limit`);
+      const counts = await countDocumentChunks(db, documentId);
+      if (counts.total === 0) {
+        throw new UnrecoverableError("PDF contains no extractable text");
       }
 
-      await prisma.document.update({
-        where: { id: documentId },
-        data: { fileSizeBytes: buffer.length },
-      });
-      await job.updateProgress(25);
-
-      const parser = new PDFParse({ data: buffer });
-      const textResult = await parser.getText();
-
-      const fullText = textResult.text;
-      const pageTexts: Array<{ text: string; pageNumber: number }> =
-        textResult.pages.map((p, i) => ({ text: p.text, pageNumber: i + 1 }));
-
-      if (pageTexts.length > MAX_PDF_PAGES) {
-        throw new UnrecoverableError(
-          `PDF exceeds the ${MAX_PDF_PAGES} page limit (${pageTexts.length} pages)`,
-        );
-      }
-
-      await prisma.document.update({
-        where: { id: documentId },
-        data: { pageCount: pageTexts.length },
-      });
-      await job.updateProgress(40);
-
-      const chunks: Array<{ content: string; pageNumber: number }> = [];
-      for (const { text, pageNumber } of pageTexts) {
-        if (!text.trim()) continue;
-        if (text.length <= CHUNK_SIZE) {
-          chunks.push({ content: text.trim(), pageNumber });
-        } else {
-          for (const c of splitIntoChunks(text)) {
-            chunks.push({ content: c, pageNumber });
-          }
-        }
-      }
-
-      this.logger.log(`Created ${chunks.length} chunks from ${pageTexts.length} pages`);
-
-      const createdChunks = await Promise.all(
-        chunks.map((chunk) =>
-          prisma.documentChunk.create({
-            data: { documentId, pageNumber: chunk.pageNumber, content: chunk.content },
-          }),
-        ),
+      const pending = await listPendingChunkEmbeddings(db, documentId);
+      let embedded = counts.total - pending.length;
+      await job.updateProgress(embeddingProgress(embedded, counts.total));
+      this.logger.log(
+        `Embedding ${pending.length} of ${counts.total} chunks for document ${documentId}`,
       );
-      await job.updateProgress(50);
 
-      const EMBED_BATCH = 5;
-      for (let i = 0; i < createdChunks.length; i += EMBED_BATCH) {
-        const batch = createdChunks.slice(i, i + EMBED_BATCH);
-        await Promise.all(
-          batch.map(async (chunk) => {
-            const embedding = await createEmbedding(chunk.content);
-            await setChunkEmbedding(prisma, chunk.id, embedding);
+      for (let i = 0; i < pending.length; i += EMBED_BATCH) {
+        const batch = pending.slice(i, i + EMBED_BATCH);
+        const vectors = await createEmbeddings(
+          batch.map((chunk) => chunk.content),
+        );
+        if (vectors.length !== batch.length) {
+          throw new Error("Embedding response did not match the chunk batch");
+        }
+
+        await setChunkEmbeddings(
+          db,
+          batch.map((chunk, index) => {
+            const embedding = vectors[index];
+            if (!embedding) {
+              throw new Error("Missing embedding for chunk");
+            }
+            return { id: chunk.id, embedding };
           }),
         );
-        const progress = 50 + Math.floor(((i + EMBED_BATCH) / createdChunks.length) * 30);
-        await job.updateProgress(Math.min(progress, 80));
+
+        embedded += batch.length;
+        await job.updateProgress(embeddingProgress(embedded, counts.total));
       }
 
-      await job.updateProgress(82);
-      const summary = await summarize(fullText);
       await job.updateProgress(92);
 
-      const title =
-        fullText
-          .split("\n")
-          .map((l) => l.trim())
-          .find((l) => l.length > 10)
-          ?.slice(0, 120) ?? url;
+      const existing = await db.document.findUnique({
+        where: { id: documentId },
+        select: { summary: true },
+      });
 
-      await prisma.document.update({
+      if (existing?.summary) {
+        await db.document.update({
+          where: { id: documentId },
+          data: { status: "READY", errorMessage: null },
+        });
+        await job.updateProgress(100);
+        this.logger.log(`Finished processing document ${documentId}`);
+        return {
+          documentId,
+          summary: existing.summary,
+          chunkCount: counts.total,
+        };
+      }
+
+      const stored = await listDocumentChunkTexts(db, documentId);
+      const summary = await summarize(sampleChunkText(stored));
+      const title = titleFromChunks(stored, url);
+
+      await db.document.update({
         where: { id: documentId },
         data: { summary, title, status: "READY", errorMessage: null },
       });
 
       await job.updateProgress(100);
       this.logger.log(`Finished processing document ${documentId}`);
-
-      return { documentId, summary, chunkCount: createdChunks.length };
+      return { documentId, summary, chunkCount: counts.total };
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "PDF processing failed";
-      await failDocument(documentId, message);
+      if (isTerminalAttempt(job, err)) {
+        const message =
+          err instanceof Error ? err.message : "PDF processing failed";
+        await failDocument(db, documentId, message);
+      }
       throw err;
     }
+  }
+
+  private async prepareChunks(
+    job: Job<PdfJobData, PdfJobResult, typeof PDF_JOB_NAME>,
+    db: PrismaClient,
+  ): Promise<void> {
+    const { documentId, url } = job.data;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new UnrecoverableError(
+        `Failed to fetch PDF: ${response.statusText}`,
+      );
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length > MAX_PDF_SIZE_BYTES) {
+      const maxMb = Math.round(MAX_PDF_SIZE_BYTES / (1024 * 1024));
+      throw new UnrecoverableError(`PDF exceeds the ${maxMb} MB size limit`);
+    }
+
+    await db.document.update({
+      where: { id: documentId },
+      data: { fileSizeBytes: buffer.length },
+    });
+    await job.updateProgress(8);
+
+    const parser = new PDFParse({ data: buffer });
+    const textResult = await parser.getText();
+    const pageTexts: PageText[] = textResult.pages.map((page, index) => ({
+      text: sanitizeText(page.text),
+      pageNumber: index + 1,
+    }));
+
+    if (pageTexts.length > MAX_PDF_PAGES) {
+      throw new UnrecoverableError(
+        `PDF exceeds the ${MAX_PDF_PAGES} page limit (${pageTexts.length} pages)`,
+      );
+    }
+
+    await db.document.update({
+      where: { id: documentId },
+      data: { pageCount: pageTexts.length },
+    });
+
+    const chunks = chunkPages(pageTexts);
+    if (chunks.length === 0) {
+      throw new UnrecoverableError("PDF contains no extractable text");
+    }
+    if (chunks.length > MAX_CHUNKS) {
+      throw new UnrecoverableError(
+        `PDF exceeds the ${MAX_CHUNKS} chunk limit (${chunks.length} chunks)`,
+      );
+    }
+
+    await job.updateProgress(15);
+    this.logger.log(
+      `Storing ${chunks.length} chunks from ${pageTexts.length} pages`,
+    );
+
+    await db.documentChunk.deleteMany({ where: { documentId } });
+
+    const rows = chunks.map((chunk) => ({
+      id: randomUUID(),
+      documentId,
+      pageNumber: chunk.pageNumber,
+      content: chunk.content,
+    }));
+
+    let inserted = 0;
+    for (let i = 0; i < rows.length; i += INSERT_BATCH) {
+      const batch = rows.slice(i, i + INSERT_BATCH);
+      await insertDocumentChunkBatch(db, batch);
+      inserted += batch.length;
+      const progress = 15 + Math.floor((inserted / rows.length) * 15);
+      await job.updateProgress(Math.min(progress, 30));
+    }
+
+    await job.updateData({ ...job.data, chunksReady: true });
   }
 }

@@ -1,5 +1,8 @@
+import { Prisma, type PrismaClient } from "../generated/prisma/client.js";
 import { EMBEDDING_DIMENSIONS } from "./constants.js";
 import type { PrismaClientType } from "./client.js";
+
+type SqlExecutor = Pick<PrismaClient, "$executeRaw">;
 
 export type SimilarChunkResult = {
   id: string;
@@ -26,18 +29,37 @@ function toVectorLiteral(embedding: number[]): string {
   return `[${embedding.join(",")}]`;
 }
 
+export async function setChunkEmbeddings(
+  db: SqlExecutor,
+  pairs: Array<{ id: string; embedding: number[] }>,
+): Promise<void> {
+  if (pairs.length === 0) return;
+
+  for (const pair of pairs) {
+    assertEmbeddingDimensions(pair.embedding);
+  }
+
+  const values = Prisma.join(
+    pairs.map(
+      (pair) =>
+        Prisma.sql`(${pair.id}::text, ${toVectorLiteral(pair.embedding)}::vector)`,
+    ),
+  );
+
+  await db.$executeRaw`
+    UPDATE "DocumentChunk" AS c
+    SET embedding = v.embedding
+    FROM (VALUES ${values}) AS v(id, embedding)
+    WHERE c.id = v.id
+  `;
+}
+
 export async function setChunkEmbedding(
-  db: PrismaClientType,
+  db: SqlExecutor,
   chunkId: string,
   embedding: number[],
 ): Promise<void> {
-  assertEmbeddingDimensions(embedding);
-
-  await db.$executeRaw`
-    UPDATE "DocumentChunk"
-    SET embedding = ${toVectorLiteral(embedding)}::vector
-    WHERE id = ${chunkId}
-  `;
+  await setChunkEmbeddings(db, [{ id: chunkId, embedding }]);
 }
 
 export async function searchSimilarChunks(

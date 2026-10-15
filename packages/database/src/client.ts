@@ -4,6 +4,7 @@ import "dotenv/config";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: ReturnType<typeof createPrismaClient> | undefined;
+  directPrisma: PrismaClient | undefined;
 };
 
 function createPrismaClient() {
@@ -24,3 +25,26 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export type PrismaClientType = typeof prisma;
+
+let directPrisma = globalForPrisma.directPrisma;
+
+/** Worker bulk writes. The API keeps using the Accelerate client. */
+export async function getDirectPrisma(): Promise<PrismaClient> {
+  if (!directPrisma) {
+    const connectionString = process.env.DIRECT_URL;
+    if (!connectionString) {
+      throw new Error("DIRECT_URL is not set");
+    }
+
+    const { PrismaPg } = await import("@prisma/adapter-pg");
+    directPrisma = new PrismaClient({
+      adapter: new PrismaPg({ connectionString }),
+    });
+
+    if (process.env.NODE_ENV !== "production") {
+      globalForPrisma.directPrisma = directPrisma;
+    }
+  }
+
+  return directPrisma;
+}
