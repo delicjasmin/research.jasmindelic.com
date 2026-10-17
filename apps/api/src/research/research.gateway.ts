@@ -6,24 +6,19 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from "@nestjs/websockets";
-import { Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { Logger, OnModuleInit } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
-import { QueueEvents } from "bullmq";
 import { streamAnswer, resolveModelId } from "ai";
 import { AuthService } from "../auth/auth.service";
 import type { AuthUser } from "../auth/auth.types";
 import { SearchService } from "../search/search.service";
-import {
-  DocumentService,
-  DocumentSummary,
-  PDF_QUEUE,
-} from "../document/document.service";
+import { DocumentService } from "../document/document.service";
 import {
   ConversationService,
   type MessageSource,
 } from "../conversation/conversation.service";
 import { UsageService } from "../usage/usage.service";
-import { getRedisConnection } from "../redis-connection";
+import { PdfProcessingService } from "../pdf/pdf-processing.service";
 
 type SubscribePayload = { documentId: string };
 type AskPayload = {
@@ -45,14 +40,11 @@ type SocketData = {
     credentials: true,
   },
 })
-export class ResearchGateway
-  implements OnGatewayInit, OnModuleInit, OnModuleDestroy
-{
+export class ResearchGateway implements OnGatewayInit, OnModuleInit {
   @WebSocketServer()
   private readonly server!: Server;
 
   private readonly logger = new Logger(ResearchGateway.name);
-  private queueEvents!: QueueEvents;
 
   constructor(
     private readonly authService: AuthService,
@@ -60,6 +52,7 @@ export class ResearchGateway
     private readonly documentService: DocumentService,
     private readonly conversationService: ConversationService,
     private readonly usageService: UsageService,
+    private readonly pdfProcessing: PdfProcessingService,
   ) {}
 
   afterInit(server: Server) {
@@ -91,59 +84,25 @@ export class ResearchGateway
   }
 
   onModuleInit() {
-    this.queueEvents = new QueueEvents(PDF_QUEUE, {
-      connection: getRedisConnection(),
+    this.pdfProcessing.setListener({
+      progress: (documentId, progress) => {
+        this.server
+          .to(documentId)
+          .emit("document:progress", { documentId, progress });
+      },
+      ready: (documentId, title, summary) => {
+        this.server.to(documentId).emit("document:ready", {
+          documentId,
+          title,
+          summary,
+        });
+      },
+      error: (documentId, message) => {
+        this.server
+          .to(documentId)
+          .emit("document:error", { documentId, message });
+      },
     });
-
-    this.queueEvents.on("progress", ({ jobId, data }) => {
-      const progress = typeof data === "number" ? data : 0;
-      this.server
-        .to(jobId)
-        .emit("document:progress", { documentId: jobId, progress });
-    });
-
-    this.queueEvents.on("completed", ({ jobId }) => {
-      void this.handleJobCompleted(jobId);
-    });
-
-    this.queueEvents.on("failed", ({ jobId }) => {
-      void this.emitTerminalDocumentError(jobId);
-    });
-  }
-
-  private async emitTerminalDocumentError(jobId: string): Promise<void> {
-    try {
-      const message =
-        await this.documentService.getTerminalFailureMessage(jobId);
-      if (!message) return;
-
-      this.server.to(jobId).emit("document:error", {
-        documentId: jobId,
-        message,
-      });
-    } catch (err) {
-      this.logger.error(`Failed to publish document error for ${jobId}`, err);
-    }
-  }
-
-  private async handleJobCompleted(jobId: string): Promise<void> {
-    try {
-      const doc: DocumentSummary =
-        await this.documentService.getDocument(jobId);
-      const title = doc.title;
-      const summary = doc.summary;
-      this.server.to(jobId).emit("document:ready", {
-        documentId: jobId,
-        title,
-        summary,
-      });
-    } catch (err) {
-      this.logger.error(`Failed to fetch completed document ${jobId}`, err);
-    }
-  }
-
-  async onModuleDestroy() {
-    await this.queueEvents?.close();
   }
 
   private getSocketUser(client: Socket): AuthUser {
@@ -190,7 +149,7 @@ export class ResearchGateway
         return;
       }
 
-      const progress = await this.documentService.getJobProgress(documentId);
+      const progress = await this.pdfProcessing.progressFor(documentId);
       if (progress > 0) {
         client.emit("document:progress", { documentId, progress });
       }

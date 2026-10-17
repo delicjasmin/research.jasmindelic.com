@@ -1,18 +1,14 @@
 import { Module } from "@nestjs/common";
-import { BullModule } from "@nestjs/bullmq";
 import { DocumentController } from "./document.controller";
-import { DocumentService, PDF_QUEUE } from "./document.service";
+import { DocumentService } from "./document.service";
 import { ConversationModule } from "../conversation/conversation.module";
 import { UsageModule } from "../usage/usage.module";
+import { PdfProcessingService } from "../pdf/pdf-processing.service";
 
 @Module({
-  imports: [
-    BullModule.registerQueue({ name: PDF_QUEUE }),
-    ConversationModule,
-    UsageModule,
-  ],
+  imports: [ConversationModule, UsageModule],
   controllers: [DocumentController],
-  providers: [DocumentService],
-  exports: [DocumentService],
+  providers: [DocumentService, PdfProcessingService],
+  exports: [DocumentService, PdfProcessingService],
 })
 export class DocumentModule {}

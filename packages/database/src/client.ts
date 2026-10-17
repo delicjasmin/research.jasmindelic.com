@@ -28,7 +28,7 @@ export type PrismaClientType = typeof prisma;
 
 let directPrisma = globalForPrisma.directPrisma;
 
-/** Worker bulk writes. The API keeps using the Accelerate client. */
+/** Bulk PDF chunk writes. The request path keeps using the Accelerate client. */
 export async function getDirectPrisma(): Promise<PrismaClient> {
   if (!directPrisma) {
     const connectionString = process.env.DIRECT_URL;

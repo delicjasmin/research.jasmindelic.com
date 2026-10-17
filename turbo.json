@@ -10,11 +10,6 @@
       "cache": false,
       "persistent": true
     },
-    "worker#dev": {
-      "dependsOn": ["build", "^build"],
-      "cache": false,
-      "persistent": true
-    },
     "lint": {},
     "typecheck": {
       "dependsOn": ["^typecheck"]

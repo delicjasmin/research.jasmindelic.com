@@ -1,18 +1,9 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { InjectQueue } from "@nestjs/bullmq";
-import { Queue } from "bullmq";
 import type { Prisma } from "database";
 import { PrismaService } from "../prisma/prisma.service";
 import { ConversationService } from "../conversation/conversation.service";
 import { UsageService } from "../usage/usage.service";
-
-export const PDF_QUEUE = "pdf-processing";
-export const PDF_JOB_NAME = "process-pdf";
-
-export type PdfJobData = {
-  documentId: string;
-  url: string;
-};
+import { PdfProcessingService } from "../pdf/pdf-processing.service";
 
 const documentSummarySelect = {
   id: true,
@@ -35,9 +26,9 @@ export type DocumentSummary = DocumentRow;
 export class DocumentService {
   constructor(
     private readonly prisma: PrismaService,
-    @InjectQueue(PDF_QUEUE) private readonly pdfQueue: Queue,
     private readonly conversationService: ConversationService,
     private readonly usageService: UsageService,
+    private readonly pdfProcessing: PdfProcessingService,
   ) {}
 
   async createDocument(
@@ -56,41 +47,13 @@ export class DocumentService {
       userId,
     );
 
-    await this.pdfQueue.add(
-      PDF_JOB_NAME,
-      { documentId: document.id, url } satisfies PdfJobData,
-      {
-        jobId: document.id,
-        attempts: 3,
-        backoff: { type: "exponential", delay: 5000 },
-      },
-    );
+    this.pdfProcessing.start(document.id);
 
     return {
       id: document.id,
       conversationId: conversation.id,
       status: document.status,
     };
-  }
-
-  async getJobProgress(documentId: string): Promise<number> {
-    const job = await this.pdfQueue.getJob(documentId);
-    if (!job) return 0;
-
-    const state = await job.getState();
-    if (state === "completed") return 100;
-
-    return typeof job.progress === "number" ? job.progress : 0;
-  }
-
-  async getTerminalFailureMessage(documentId: string): Promise<string | null> {
-    const job = await this.pdfQueue.getJob(documentId);
-    if (!job) return null;
-
-    const state = await job.getState();
-    if (state !== "failed") return null;
-
-    return job.failedReason || "Processing failed";
   }
 
   async getDocument(id: string): Promise<DocumentSummary> {
